@@ -2,18 +2,17 @@
 sodalite service for instagram reels
 """
 
-# error importing
-from server.helper.errors import *
-
-# standard library imports
+from server.helper.errors import InstagramReelsError
+from server.models.metadata import SodaliteMetadata, VideoQuality, AudioQuality, Author
+from pydantic import HttpUrl
+from typing import List
 import aiohttp
 import re
 import json
 
-# helper functions
-async def extract_json_from_raw_url(url: str) -> dict:
+async def _get_raw_data(url: str) -> str:
     """
-    takes in a raw instagram reels url, and returns a dictionary with the reel data
+    fetches the raw html from the instagram reels url
     """
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -37,83 +36,84 @@ async def extract_json_from_raw_url(url: str) -> dict:
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as response:
             if not response.ok:
-                raise InstagramReelsError(f"Failed to fetch data from {url}")
+                raise InstagramReelsError(f"failed to fetch data from {url}")
+            return await response.text(encoding='utf-8', errors='ignore')
 
-            raw_data = await response.text(encoding='utf-8', errors='ignore')
-
-            # let's find the script tag with the JSON data using regex my most trusted friend
-            # e.g. <script type="application/json" data-content-len="xxxxxx" data-sjs>
-            pattern = r'\s*<script[^>]*data-content-len[^>]*data-sjs[^>]*>([^<]*)</script>'
-            matches = re.findall(pattern, raw_data)
-
-            if not matches:
-                raise InstagramReelsError("Could not find JSON data in the response :(")
-
-            # look for the one with video_dash_manifest
-            json_data = None
-            for match in matches:
-                try:
-                    if "video_dash_manifest" in match:
-                        json_data = json.loads(match)
-                        break
-                except json.JSONDecodeError:
-                    continue
-
-            if not json_data:
-                raise InstagramReelsError("Could not find JSON data with video_dash_manifest :(")
-
-            # found you 8)
-            return json_data
-    return {}
-
-async def extract_cdn_link_from_json(json_data: dict) -> str:
+def _extract_json_from_raw_data(raw_data: str) -> dict:
     """
-    extracts the cdn link from the json data
+    extracts the json data from the raw html
     """
-    # navigate through the nested structure to find media items
-    try:
-        # i know this is really ugly, but this is the only way to get the data
-        edges = json_data["require"][0][3][0]["__bbox"]["require"][0][3][1]["__bbox"]["result"]["data"]["xdt_api__v1__clips__clips_on_logged_out_connection_v2"]["edges"]
-    except (KeyError, IndexError, TypeError):
-        raise InstagramReelsError("Could not find media data in JSON structure")
+    pattern = r'\s*<script[^>]*data-content-len[^>]*data-sjs[^>]*>([^<]*)</script>'
+    matches = re.findall(pattern, raw_data)
+    if not matches:
+        raise InstagramReelsError("could not find json data in the response")
 
-    # find the media with the highest quality video version (hack for now - no quality selection)
-    best_url = None
-    highest_width = 0
-
-    for edge in edges:
+    for match in matches:
         try:
-            media = edge["node"]["media"]
-            video_versions = media.get("video_versions", [])
-
-            # let's find the best quality
-            for version in video_versions:
-                url = version.get("url", "")
-                # type 101 seems to be the standard video type (correct me if i'm wrong github)
-                if url and version.get("type") == 101:
-                    best_url = url
-                    break
-
-            # ka-ching.
-            if best_url:
-                break
-
-        except (KeyError, TypeError):
+            if "video_dash_manifest" in match:
+                return json.loads(match)
+        except json.JSONDecodeError:
             continue
+    raise InstagramReelsError("could not find json data with video_dash_manifest")
 
-    if not best_url:
-        raise InstagramReelsError("No video URL found in the JSON data")
-
-    return best_url
-
-async def fetchdl(url: str) -> str:
+def _parse_metadata_from_json(json_data: dict, source_url: str) -> SodaliteMetadata:
     """
-    takes in a raw instagram reels url, and returns the cdn link for the video
+    parses the json data and returns a SodaliteMetadata object
     """
-    # extract the JSON data from the URL
-    json_data = await extract_json_from_raw_url(url)
+    try:
+        media_data = json_data["require"][0][3][0]["__bbox"]["require"][0][3][1]["__bbox"]["result"]["data"]["xdt_api__v1__clips__clips_on_logged_out_connection_v2"]["edges"][0]["node"]["media"]
+    except (KeyError, IndexError, TypeError):
+        raise InstagramReelsError("could not find media data in json structure")
 
-    # extract the CDN link from the JSON data
-    cdn_link = await extract_cdn_link_from_json(json_data)
+    videos: List[VideoQuality] = []
+    for version in media_data.get("video_versions", []):
+        if version.get("url"):
+            videos.append(VideoQuality(
+                url=version["url"],
+                quality_label=f'{version.get("height", "unknown")}p',
+                width=version.get("width"),
+                height=version.get("height"),
+                mime_type=version.get("mime_type", "video/mp4")
+            ))
 
-    return cdn_link
+    # instagram doesn't provide separate audio streams in this json, so we leave it empty
+    audios: List[AudioQuality] = []
+
+    author_data = media_data.get("owner", {})
+
+    profile_url = None
+    if author_data.get("username"):
+        profile_url = HttpUrl(f'https://instagram.com/{author_data.get("username")}')
+
+    author = Author(
+        username=author_data.get("username", "unknown"),
+        display_name=author_data.get("full_name"),
+        profile_url=profile_url,
+        avatar_url=author_data.get("profile_pic_url")
+    )
+
+    title = media_data.get("title") or f"instagram reel by {author.username}"
+    description = None
+    if media_data.get("edge_media_to_caption", {}).get("edges"):
+        description = media_data["edge_media_to_caption"]["edges"][0]["node"]["text"]
+
+
+    return SodaliteMetadata(
+        service="instagram_reels",
+        source_url=HttpUrl(source_url),
+        title=title,
+        description=description,
+        author=author,
+        thumbnail_url=media_data.get("display_url"),
+        videos=videos,
+        audios=audios
+    )
+
+async def fetch_dl(url: str) -> SodaliteMetadata:
+    """
+    takes in a raw instagram reels url, and returns the metadata
+    """
+    raw_data = await _get_raw_data(url)
+    json_data = _extract_json_from_raw_data(raw_data)
+    metadata = _parse_metadata_from_json(json_data, url)
+    return metadata

@@ -16,6 +16,7 @@ no accounts, no ads, no tracking. just downloads.
 
 ## supported services
 
+- tiktok
 - youtube
 - instagram reels
 - ... more to come!

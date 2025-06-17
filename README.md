@@ -16,6 +16,7 @@ no accounts, no ads, no tracking. just downloads.
 
 ## supported services
 
+- youtube
 - instagram reels
 - ... more to come!
 
@@ -26,6 +27,10 @@ no accounts, no ads, no tracking. just downloads.
 ## contributing
 
 pull requests welcome. please check existing issues before opening new ones.
+
+# special thanks to
+
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) for the download backend
 
 ## license
 

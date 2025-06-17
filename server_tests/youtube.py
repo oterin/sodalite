@@ -10,16 +10,16 @@ from pprint import pprint
 # so we can import server
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from server.services import instagram_reels as igreels
+from server.services import youtube as yt
 
 async def main():
     # test url
-    url = "https://www.instagram.com/reels/DK9juO1KM4R/"
+    url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     print(f"fetching: {url}")
 
     try:
         # get the metadata
-        metadata = await igreels.fetch_dl(url)
+        metadata = await yt.fetch_dl(url)
 
         # print it out
         pprint(metadata.model_dump())

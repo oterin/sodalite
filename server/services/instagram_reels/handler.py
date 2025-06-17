@@ -59,7 +59,7 @@ def _extract_json_from_raw_data(raw_data: str) -> dict:
 
     raise InstagramReelsError("could not find the correct media data json in any of the script tags")
 
-def _find_media_data(data: any) -> Optional[dict]:
+def _find_media_data(data: dict) -> Optional[dict]:
     """recursively search for the main media data blob in the json"""
     if isinstance(data, dict):
         required_keys = ['video_dash_manifest', 'owner', 'image_versions2', 'caption', 'pk']
@@ -124,7 +124,7 @@ def _parse_metadata_from_json(json_data: dict) -> SodaliteMetadata:
     caption_node = media_data.get("caption")
     title = caption_node.get("text").split('\n')[0] if caption_node and caption_node.get("text") else f"Instagram Reel by {author}"
 
-    thumbnail_url = media_data.get("image_versions2", {}).get("candidates", [{}])[0].get("url")
+    # thumbnail_url = media_data.get("image_versions2", {}).get("candidates", [{}])[0].get("url")
 
     return SodaliteMetadata(
         service="instagram",

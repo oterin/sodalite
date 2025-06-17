@@ -20,5 +20,13 @@ def detect_service(url: str) -> str:
     ):
         return "instagram_reels"
 
+    # youtube division
+    if (
+        "youtube.com/watch" in url
+        or "youtu.be/" in url
+        or "youtube.com/shorts" in url
+    ):
+        return "youtube"
+
 
     return "unknown"

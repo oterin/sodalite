@@ -7,3 +7,6 @@ class InstagramReelsError(Exception):
 
 class YouTubeError(Exception):
     pass
+
+class TikTokError(Exception):
+    pass

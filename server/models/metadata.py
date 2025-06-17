@@ -3,11 +3,12 @@ metadata models for sodalite services
 """
 
 from pydantic import BaseModel, HttpUrl
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 class Video(BaseModel):
     """a video download option"""
     url: HttpUrl
+    headers: Optional[Dict[str, str]] = None  # optional headers for the request
     quality: str  # e.g. "1080p"
     width: Optional[int] = None
     height: Optional[int] = None
@@ -15,6 +16,7 @@ class Video(BaseModel):
 class Audio(BaseModel):
     """an audio download option"""
     url: HttpUrl
+    headers: Optional[Dict[str, str]] = None  # optional headers for the request
     quality: str # e.g. "128kbps"
 
 class SodaliteMetadata(BaseModel):

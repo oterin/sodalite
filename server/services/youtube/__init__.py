@@ -1,6 +1,5 @@
 """
-YouTube service module for Sodalite.
-Provides functionality to extract metadata and stream URLs from YouTube videos.
+youtube service module for sodalite.
 """
 
 from .handler import fetch_dl, YouTubeError

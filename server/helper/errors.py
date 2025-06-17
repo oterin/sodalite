@@ -1,0 +1,6 @@
+"""
+neat sodalite module to make the code slightly cleaner
+"""
+
+class InstagramReelsError(Exception):
+    pass

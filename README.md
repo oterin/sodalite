@@ -16,7 +16,8 @@ no accounts, no ads, no tracking. just downloads.
 
 ## supported services
 
-- none... yet!
+- instagram reels
+- ... more to come!
 
 ## installation
 

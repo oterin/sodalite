@@ -6,6 +6,10 @@ a simple downloader for the web
 
 sodalite is an open-source, no-fuss downloader. paste a link from a supported service, receive the file download. that's it.
 
+## disclaimer
+
+this project is provided for demonstration and educational purposes only. its use may be subject to legal considerations depending on your location. the author(s) and contributors are not responsible for any outcomes from using, sharing, or modifying this software. users should ensure they follow applicable laws and regulations. proceed at your own discretion.
+
 ## how to use
 
 1. copy a link from a supported service

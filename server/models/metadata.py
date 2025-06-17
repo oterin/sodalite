@@ -1,50 +1,29 @@
 """
-sodalite metadata format
-
-this holds our standardized metadata model that all services return
+metadata models for sodalite services
 """
 
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
 
-class VideoQuality(BaseModel):
-    """
-    a single video download option
-    """
+class Video(BaseModel):
+    """a video download option"""
     url: HttpUrl
-    quality_label: str # e.g., "1080p", "720p"
+    quality: str  # e.g. "1080p"
     width: Optional[int] = None
     height: Optional[int] = None
-    bitrate: Optional[int] = None
-    mime_type: Optional[str] = None # e.g., "video/mp4"
 
-class AudioQuality(BaseModel):
-    """
-    a single audio download option
-    """
+class Audio(BaseModel):
+    """an audio download option"""
     url: HttpUrl
-    quality_label: str # e.g., "128kbps"
-    bitrate: Optional[int] = None
-    mime_type: Optional[str] = None # e.g., "audio/mp4"
-
-class Author(BaseModel):
-    """
-    creator info
-    """
-    username: str
-    display_name: Optional[str] = None
-    profile_url: Optional[HttpUrl] = None
-    avatar_url: Optional[HttpUrl] = None
+    quality: str # e.g. "128kbps"
 
 class SodaliteMetadata(BaseModel):
     """
-    unified metadata format for all services
+    the metadata for a sodalite link preview
     """
     service: str
-    source_url: HttpUrl
     title: str
-    description: Optional[str] = None
-    author: Author
+    author: str # just the name
     thumbnail_url: Optional[HttpUrl] = None
-    videos: List[VideoQuality] = []
-    audios: List[AudioQuality] = []
+    videos: List[Video] = []
+    audios: List[Audio] = []

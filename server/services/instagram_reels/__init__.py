@@ -2,6 +2,6 @@
 sodalite instagram reels service
 """
 
-from .handler import fetchdl
+from .handler import fetch_dl
 
-__all__ = ["fetchdl"]
+__all__ = ["fetch_dl"]

@@ -28,5 +28,11 @@ def detect_service(url: str) -> str:
     ):
         return "youtube"
 
+    # tiktok division
+    if (
+        "tiktok.com/" in url
+    ):
+        return "tiktok"
+
 
     return "unknown"

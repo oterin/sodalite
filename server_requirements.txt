@@ -6,3 +6,4 @@ yt-dlp
 python-multipart
 aiofiles
 mutagen
+brotli

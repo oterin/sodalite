@@ -1,7 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = ""; // Use relative paths for Vercel deployment
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -68,6 +67,7 @@ export const sodaliteAPI = {
   },
 
   getDownloadUrl: (taskId: string): string => {
-    return `${API_BASE_URL}/api/download/${taskId}/file`;
+    // This is now a relative path, which is correct for same-origin downloads.
+    return `/api/download/${taskId}/file`;
   },
 };

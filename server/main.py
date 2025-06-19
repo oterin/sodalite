@@ -2,17 +2,19 @@
 sodalite api server - the main entry point
 """
 
-import sre_parse
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from mutagen.flac import SeekPoint
-from pydantic import BaseModel, HttpUrl
-from typing import Optional, Literal
 import os
 import tempfile
 import hashlib
+import json
+import redis
 from datetime import datetime
+from pydantic.json import pydantic_encoder
+
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, HttpUrl
+from typing import Optional, Literal
 
 from server.helper.detector import detect_service
 from server.helper.errors import (
@@ -36,6 +38,13 @@ app = FastAPI(
 )
 
 # cors middleware (because we like, need that lol)
+# in a real prod app, you'd want to be more restrictive
+# but for this project, we'll allow all origins
+origins = [
+    "http://localhost:3000",
+    "https://sodalite-frontend.vercel.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # gonna need to change this in prod
@@ -45,15 +54,31 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# request model
+# Connect to Redis
+# Render provides the REDIS_URL environment variable
+redis_url = os.environ.get("REDIS_URL")
+if not redis_url:
+    print("WARNING: REDIS_URL environment variable not set. Using in-memory storage.")
+    # Fallback to a mock Redis for local dev if you don't have Redis installed
+    # For production, this should throw an error.
+    from unittest.mock import Mock
+    r = Mock()
+    r.hgetall = Mock(return_value=None)
+    r.hset = Mock()
+    r.delete = Mock()
+
+else:
+    r = redis.from_url(redis_url, decode_responses=True)
+
+
 # request/response models
 class DownloadRequest(BaseModel):
     url: HttpUrl
 
 class ProcessRequest(BaseModel):
     url: HttpUrl
-    video_quality: Optional[str] = None  # if None, use best
-    audio_quality: Optional[str] = None  # if None, use best
+    video_quality: Optional[str] = None
+    audio_quality: Optional[str] = None
     format: str = "mp4"
     download_mode: Literal["default", "video_only", "audio_only"] = "default"
 
@@ -74,8 +99,6 @@ class ServiceInfo(BaseModel):
 class ServicesResponse(BaseModel):
     services: dict[str, ServiceInfo]
 
-# task storage (we'll use a db later this is hacky ik)
-TASKS = {}
 
 # tempdir for dls
 TEMP_DIR = tempfile.gettempdir()
@@ -135,7 +158,7 @@ async def process_download_task(
     because most services LOOOOOOOVE to separate them for some odd fuCKING REASOn
     """
     try:
-        TASKS[task_id]["status"] = "processing"
+        r.hset(task_id, "status", "processing")
 
         # download and merge the streams
         output_path = await download_and_merge(
@@ -147,14 +170,19 @@ async def process_download_task(
             download_mode=request.download_mode
         )
 
-        # update task status
-        TASKS[task_id]["status"] = "completed"
-        TASKS[task_id]["download_url"] = f"/api/download/{task_id}/file"
-        TASKS[task_id]["file_path"] = output_path
+        # update task status in Redis
+        r.hset(task_id, mapping={
+            "status": "completed",
+            "download_url": f"/api/download/{task_id}/file",
+            "file_path": output_path
+        })
+
 
     except Exception as e:
-        TASKS[task_id]["status"] = "failed"
-        TASKS[task_id]["error"] = str(e)
+        r.hset(task_id, mapping={
+            "status": "failed",
+            "error": str(e)
+        })
 
         # log for debugging rq
         import traceback
@@ -221,7 +249,7 @@ async def get_download_info(request: DownloadRequest):
         }
     }
 )
-async def proces_download(
+async def process_download(
     request: ProcessRequest,
     background_tasks: BackgroundTasks
 ):
@@ -253,12 +281,16 @@ async def proces_download(
 
         # create task
         task_id = generate_task_id(url_str)
-        TASKS[task_id] = {
+
+        # Serialize complex objects to JSON strings for Redis
+        task_data = {
             "status": "processing",
-            "metadata": metadata,
-            "request": request,
-            "created_at": datetime.now(),
+            "metadata": json.dumps(metadata, default=pydantic_encoder),
+            "request": json.dumps(request, default=pydantic_encoder),
+            "created_at": datetime.now().isoformat(),
         }
+        r.hset(task_id, mapping=task_data)
+        r.expire(task_id, 3600) # Expire task data after 1 hour
 
         # start background task to download the task
         background_tasks.add_task(
@@ -287,7 +319,7 @@ async def get_task_status(task_id: str):
     """
     get the status of a download task
     """
-    task = TASKS.get(task_id)
+    task = r.hgetall(task_id)
     if not task:
         raise HTTPException(
             status_code=404,
@@ -306,7 +338,7 @@ async def download_file(task_id: str):
     """
     download the processed file for a task
     """
-    task = TASKS.get(task_id)
+    task = r.hgetall(task_id)
     if not task:
         raise HTTPException(
             status_code=404,
@@ -326,28 +358,21 @@ async def download_file(task_id: str):
             detail={"error": "file not found"}
         )
 
-    # get original filename for metadata
-    metadata = task["metadata"]
-    filename = f"{metadata.title[:50]}_{metadata.author[:30]}.{task['request'].format}".replace(" ", "_").replace("/", "_")
+    # Deserialize metadata and request from JSON
+    metadata = SodaliteMetadata(**json.loads(task["metadata"]))
+    request_data = ProcessRequest(**json.loads(task["request"]))
+
+    filename = f"{metadata.title[:50]}_{metadata.author[:30]}.{request_data.format}".replace(" ", "_").replace("/", "_")
     filename = "".join(c for c in filename if c.isalnum() or c in "._-") # sanitizing the filename (we don't want any funny business)
 
     # return the file response
-    media_type_map = {
-        "mp4": "video/mp4",
-        "webm": "video/webm",
-        "mkv": "video/x-matroska",
-        "mp3": "audio/mpeg",
-        "m4a": "audio/mp4"
-    }
-
-    file_format = task['request'].format
-    media_type = media_type_map.get(file_format, "application/octet-stream")
-
-
     return FileResponse(
         path=file_path,
         filename=filename,
-        media_type=media_type
+        media_type=(
+            "video/mp4" if request_data.format == "mp4" else
+            f"video/{request_data.format.replace(" (muxed)", "")}"
+        )
     )
 
 @app.get(
@@ -373,9 +398,20 @@ async def health_check():
     except:
         ffmpeg_available = False
 
+    # Check redis connection
+    redis_available = False
+    if r:
+        try:
+            r.ping()
+            redis_available = True
+        except:
+            redis_available = False
+
+
     return {
         "status": "ok",
         "ffmpeg_available": ffmpeg_available,
+        "redis_available": redis_available,
         "temp_dir": DOWNLOAD_DIR
     }
 
@@ -384,7 +420,7 @@ async def cleanup_task(task_id: str):
     """
     cleanup a task and its associated files
     """
-    task = TASKS.get(task_id)
+    task = r.hgetall(task_id)
     if not task:
         raise HTTPException(status_code=404, detail={"error": "task not found"})
 
@@ -393,7 +429,7 @@ async def cleanup_task(task_id: str):
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
 
-    # remove task
-    del TASKS[task_id]
+    # remove task from Redis
+    r.delete(task_id)
 
     return {"status": "cleaned"}

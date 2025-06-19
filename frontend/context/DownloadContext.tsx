@@ -41,11 +41,11 @@ export const DownloadProvider = ({ children }: { children: ReactNode }) => {
     const progressInterval = setInterval(() => {
       setTasks((currentTasks) =>
         currentTasks.map((task) => {
-          if (task.status === "processing" && task.progress < 90) {
-            const increment = Math.random() * 3;
+          if (task.status === "processing" && task.progress < 95) {
+            const increment = Math.random() * 5;
             return {
               ...task,
-              progress: Math.min(task.progress + increment, 90),
+              progress: Math.min(task.progress + increment, 95),
             };
           }
           return task;
@@ -54,27 +54,45 @@ export const DownloadProvider = ({ children }: { children: ReactNode }) => {
     }, 800);
 
     const statusInterval = setInterval(() => {
-      tasks.forEach((task) => {
-        if (task.status === "processing") {
-          sodaliteAPI.getTaskStatus(task.task_id).then((updatedTask) => {
-            if (updatedTask.status !== "processing") {
-              setTasks((currentTasks) =>
-                currentTasks.map((t) =>
-                  t.task_id === updatedTask.task_id
-                    ? {
-                        ...t,
-                        status: updatedTask.status,
-                        download_url: updatedTask.download_url,
-                        error: updatedTask.error,
-                        progress:
-                          updatedTask.status === "completed" ? 100 : t.progress,
-                      }
-                    : t,
-                ),
-              );
-            }
+      setTasks((currentTasks) => {
+        const processingTasks = currentTasks.filter(
+          (task) => task.status === "processing",
+        );
+
+        if (processingTasks.length > 0) {
+          processingTasks.forEach((task) => {
+            sodaliteAPI
+              .getTaskStatus(task.task_id)
+              .then((updatedTask) => {
+                if (updatedTask.status !== "processing") {
+                  setTasks((prevTasks) =>
+                    prevTasks.map((t) =>
+                      t.task_id === updatedTask.task_id
+                        ? {
+                            ...t,
+                            status: updatedTask.status,
+                            download_url: updatedTask.download_url,
+                            error: updatedTask.error,
+                            progress:
+                              updatedTask.status === "completed"
+                                ? 100
+                                : t.progress,
+                          }
+                        : t,
+                    ),
+                  );
+                }
+              })
+              .catch((error) => {
+                console.error(
+                  `Failed to get status for task ${task.task_id}:`,
+                  error,
+                );
+              });
           });
         }
+
+        return currentTasks;
       });
     }, 2000);
 
@@ -82,7 +100,7 @@ export const DownloadProvider = ({ children }: { children: ReactNode }) => {
       clearInterval(progressInterval);
       clearInterval(statusInterval);
     };
-  }, [tasks]);
+  }, []);
 
   const addTask = (
     task: ProcessResponse,

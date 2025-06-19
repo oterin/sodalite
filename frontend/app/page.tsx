@@ -11,6 +11,7 @@ import {
   type ProcessResponse,
 } from "@/lib/api";
 import { toast } from "sonner";
+import axios from "axios";
 
 export default function Home() {
   const [metadata, setMetadata] = useState<DownloadMetadata | null>(null);
@@ -29,9 +30,16 @@ export default function Home() {
       setMetadata(data);
       toast.success("Media found! Select quality to download.");
     } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.detail?.error || "Failed to fetch media info";
-      toast.error(errorMessage);
+      if (axios.isAxiosError(error)) {
+        const errorMessage =
+          error.response?.data?.detail?.error ||
+          error.response?.data?.detail ||
+          "Failed to fetch media info";
+        toast.error(errorMessage);
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      console.error("Error fetching download info:", error);
     } finally {
       setIsLoading(false);
     }

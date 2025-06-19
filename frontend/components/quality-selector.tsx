@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import axios from "axios";
 import {
   Card,
   CardContent,
@@ -32,13 +33,16 @@ interface QualitySelectorProps {
   onTaskCreated: (task: ProcessResponse) => void;
 }
 
-export function QualitySelector({ metadata, url, onTaskCreated }: QualitySelectorProps) {
-  url: url;
+export function QualitySelector({
+  metadata,
+  url,
+  onTaskCreated,
+}: QualitySelectorProps) {
   const [selectedVideo, setSelectedVideo] = useState<string | undefined>(
-    metadata.videos[0]?.quality
+    metadata.videos[0]?.quality,
   );
   const [selectedAudio, setSelectedAudio] = useState<string | undefined>(
-    metadata.audios[0]?.quality
+    metadata.audios[0]?.quality,
   );
   const [format, setFormat] = useState<"mp4" | "webm" | "mkv">("mp4");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -48,18 +52,25 @@ export function QualitySelector({ metadata, url, onTaskCreated }: QualitySelecto
 
     try {
       const response = await sodaliteAPI.processDownload({
-        url: window.location.href, // we lowk need the original url
+        url: url, // Use the actual URL prop
         video_quality: selectedVideo,
         audio_quality: selectedAudio,
         format,
       });
 
       onTaskCreated(response);
-      toast.success("Procesing started! Your download will be ready soon.");
+      toast.success("Processing started! Your download will be ready soon.");
     } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.detail?.error || "Failed to start download";
-      toast.error(errorMessage);
+      if (axios.isAxiosError(error)) {
+        const errorMessage =
+          error.response?.data?.detail?.error ||
+          error.response?.data?.detail ||
+          "Failed to start download";
+        toast.error(errorMessage);
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      console.error("Error starting download:", error);
     } finally {
       setIsProcessing(false);
     }
@@ -69,7 +80,9 @@ export function QualitySelector({ metadata, url, onTaskCreated }: QualitySelecto
     <Card>
       <CardHeader>
         <CardTitle className="line-clamp-1">{metadata.title}</CardTitle>
-        <CardDescription>by {metadata.author} • {metadata.service}</CardDescription>
+        <CardDescription>
+          by {metadata.author} • {metadata.service}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {metadata.videos.length > 0 && (
@@ -135,10 +148,15 @@ export function QualitySelector({ metadata, url, onTaskCreated }: QualitySelecto
           </div>
         </div>
 
-        <Button className="w-full" onClick={handleDownload} disabled={isProcessing}>
+        <Button
+          className="w-full"
+          onClick={handleDownload}
+          disabled={isProcessing}
+        >
           <Download className="mr-2 h-4 w-4" />
           {isProcessing ? "Processing..." : "Download"}
         </Button>
       </CardContent>
     </Card>
   );
+}

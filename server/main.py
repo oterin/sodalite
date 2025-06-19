@@ -15,9 +15,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, Literal
 
-# Import the Vercel KV client
-from vercel_kv import kv
-
 from server.helper.detector import detect_service
 from server.helper.errors import (
     InstagramReelsError,
@@ -83,6 +80,11 @@ TEMP_DIR = tempfile.gettempdir()
 DOWNLOAD_DIR = os.path.join(TEMP_DIR, "sodalite_downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+# In-memory store for tasks (replace Vercel KV)
+# In a real-world scenario, this would ideally be a proper database or a persistent key-value store
+# as this will not persist across server restarts.
+tasks = {}
+
 # service mapping (should be extensible 💐)
 SERVICE_HANDLERS = {
     "instagram_reels": instagram_reels.fetch_dl,
@@ -136,8 +138,8 @@ async def process_download_task(
     because most services LOOOOOOOVE to separate them for some odd fuCKING REASOn
     """
     try:
-        # Update status in Vercel KV
-        kv.hset(task_id, {"status": "processing"})
+        # Update status in local tasks dictionary
+        tasks[task_id]["status"] = "processing"
 
         # download and merge the streams
         output_path = await download_and_merge(
@@ -150,17 +152,14 @@ async def process_download_task(
         )
 
         # update task status
-        kv.hset(
-            task_id,
-            mapping={
-                "status": "completed",
-                "download_url": f"/api/download/{task_id}/file",
-                "file_path": output_path
-            }
-        )
+        tasks[task_id].update({
+            "status": "completed",
+            "download_url": f"/api/download/{task_id}/file",
+            "file_path": output_path
+        })
 
     except Exception as e:
-        kv.hset(task_id, mapping={"status": "failed", "error": str(e)})
+        tasks[task_id].update({"status": "failed", "error": str(e)})
 
         # log for debugging rq
         import traceback
@@ -260,17 +259,18 @@ async def proces_download(
         # create task
         task_id = generate_task_id(url_str)
 
-        # Serialize complex objects to JSON strings for KV store
+        # Serialize complex objects to JSON strings for local storage
         task_data = {
             "status": "processing",
-            "metadata": json.dumps(metadata, default=pydantic_encoder),
-            "request": json.dumps(request, default=pydantic_encoder),
+            "metadata": metadata.model_dump_json(),
+            "request": request.model_dump_json(),
             "created_at": datetime.now().isoformat(),
         }
 
-        # Use Vercel KV to store the task data
-        kv.hset(task_id, mapping=task_data)
-        kv.expire(task_id, time=timedelta(hours=1)) # Expire task after 1 hour
+        # Use local dictionary to store the task data
+        tasks[task_id] = task_data
+        # Note: In-memory tasks will not persist across server restarts.
+        # No explicit expiration for in-memory tasks as `timedelta` is for KV.
 
         # start background task to download the task
         background_tasks.add_task(
@@ -299,8 +299,8 @@ async def get_task_status(task_id: str):
     """
     get the status of a download task
     """
-    # Use Vercel KV to get the task
-    task = kv.hgetall(task_id)
+    # Use local dictionary to get the task
+    task = tasks.get(task_id)
     if not task:
         raise HTTPException(
             status_code=404,
@@ -319,8 +319,8 @@ async def download_file(task_id: str):
     """
     download the processed file for a task
     """
-    # Use Vercel KV to get the task
-    task = kv.hgetall(task_id)
+    # Use local dictionary to get the task
+    task = tasks.get(task_id)
     if not task:
         raise HTTPException(
             status_code=404,
@@ -347,7 +347,7 @@ async def download_file(task_id: str):
     if not metadata_json or not request_json:
         raise HTTPException(
             status_code=500,
-            detail={"error": "Task data incomplete in KV store, cannot determine file properties."}
+            detail={"error": "Task data incomplete in local store, cannot determine file properties."}
         )
 
     metadata = SodaliteMetadata.parse_raw(metadata_json)
@@ -408,8 +408,8 @@ async def cleanup_task(task_id: str):
     """
     cleanup a task and its associated files
     """
-    # Use Vercel KV to get the task
-    task = kv.hgetall(task_id)
+    # Use local dictionary to get the task
+    task = tasks.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail={"error": "task not found"})
 
@@ -418,7 +418,8 @@ async def cleanup_task(task_id: str):
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
 
-    # remove task from KV
-    kv.delete(task_id)
+    # remove task from local dictionary
+    if task_id in tasks:
+        del tasks[task_id]
 
     return {"status": "cleaned"}

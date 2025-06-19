@@ -22,7 +22,7 @@ export default function Home() {
       const data = await sodaliteAPI.getDownloadInfo(url);
       setMetadata(data);
       toast.success("found it! here are the details.");
-    } catch (error: any) {
+    } catch (error) {
       if (axios.isAxiosError(error)) {
         const errorMessage =
           error.response?.data?.detail?.error ||

@@ -1,5 +1,5 @@
 """
-sodaltie downloader - handles downloading and merging with ffmpeg
+sodalite downloader - handles downloading and merging with ffmpeg
 """
 
 import os
@@ -7,35 +7,32 @@ import asyncio
 import aiohttp
 import tempfile
 import subprocess
+import concurrent.futures
 from typing import Optional, Tuple
 from server.models.metadata import SodaliteMetadata, Video, Audio
 
-async def download_stream(
-    url: str,
-    output_path: str,
-    headers: Optional[dict] = None,
-) -> None:
+async def download_stream(url: str, output_path: str, headers: Optional[dict] = None) -> None:
     """
     download a stream to a file
     """
     headers = headers or {}
     headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        })
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    })
 
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as response:
             response.raise_for_status()
 
-            with open(output_path, 'wb') as f:
+            with open(output_path, 'wb') as file:
                 async for chunk in response.content.iter_chunked(8192):
-                    f.write(chunk)
+                    file.write(chunk)
 
 def get_best_streams(
     metadata: SodaliteMetadata,
     video_quality: Optional[str] = None,
     audio_quality: Optional[str] = None
-) ->  Tuple[Optional[Video], Optional[Audio]]:
+) -> Tuple[Optional[Video], Optional[Audio]]:
     """
     select the best video and audio streams based on quality preferences
     """
@@ -45,29 +42,28 @@ def get_best_streams(
     # select video
     if metadata.videos:
         if video_quality:
-            # lets try to find an exact match first
+            # try to find exact match
             for v in metadata.videos:
                 if v.quality == video_quality:
                     video = v
                     break
 
-
-            # if no match or no preference, let's use the best available
-            if not video:
-                video = metadata.videos[0]
+        # if no match or no preference, use best (first in sorted list)
+        if not video:
+            video = metadata.videos[0]
 
     # select audio
     if metadata.audios:
         if audio_quality:
-            # lets try to find an exact match first
+            # try to find exact match
             for a in metadata.audios:
                 if a.quality == audio_quality:
                     audio = a
                     break
 
-            # if no match or no preference, let's use the best available
-            if not audio:
-                audio = metadata.audios[0]
+        # if no match or no preference, use best
+        if not audio:
+            audio = metadata.audios[0]
 
     return video, audio
 
@@ -75,12 +71,21 @@ async def download_and_merge(
     metadata: SodaliteMetadata,
     video_quality: Optional[str] = None,
     audio_quality: Optional[str] = None,
-    output_format: str = 'mp4',
-    output_dir: str = ''
+    output_format: str = "mp4",
+    output_dir: str = None,
+    download_mode: str = "default"
 ) -> str:
     """
-    download video and audio streams, merge them using ffmpeg, and inject metadata
+    download video and audio streams, merge them with ffmpeg, and inject metadata
     """
+    # Check if ffmpeg is available
+    try:
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        raise RuntimeError("ffmpeg is not installed or not in PATH. Please install ffmpeg.")
+
+    if output_dir is None:
+        output_dir = tempfile.gettempdir()
 
     # create unique filenames
     base_name = f"{metadata.service}_{hash(metadata.title)}"
@@ -92,6 +97,11 @@ async def download_and_merge(
         # get best streams
         video, audio = get_best_streams(metadata, video_quality, audio_quality)
 
+        if download_mode == "video_only":
+            audio = None
+        elif download_mode == "audio_only":
+            video = None
+
         if not video and not audio:
             raise ValueError("no video or audio streams available")
 
@@ -102,8 +112,10 @@ async def download_and_merge(
         if audio:
             tasks.append(download_stream(str(audio.url), audio_path, audio.headers))
 
+        await asyncio.gather(*tasks)
+
         # prepare ffmpeg command
-        ffmpeg_cmd = ["ffmpeg", "-y"] # -y to overwrite output files
+        ffmpeg_cmd = ["ffmpeg", "-y"]  # -y to overwrite
 
         # add inputs
         if video and os.path.exists(video_path):
@@ -111,19 +123,28 @@ async def download_and_merge(
         if audio and os.path.exists(audio_path):
             ffmpeg_cmd.extend(["-i", audio_path])
 
-        # if we have both video and audio, we can merge them
+        # if we have both video and audio, merge them
         if video and audio and os.path.exists(video_path) and os.path.exists(audio_path):
-            ffmpeg_cmd.extend([
-                "-c:v", "copy", # copy video codec
-                "-c:a", "aac",  # convert audio to aac
-                "-b:a", "192k", # audio bitrate
-            ])
+            ffmpeg_cmd.extend(["-c:v", "copy"])
+            if output_format == "webm":
+                ffmpeg_cmd.extend(["-c:a", "libopus"]) # webm requires opus/vorbis
+            else:
+                ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
         elif video and os.path.exists(video_path):
             # video only
             ffmpeg_cmd.extend(["-c:v", "copy"])
         elif audio and os.path.exists(audio_path):
             # audio only
-            ffmpeg_cmd.extend(["-c:a", "copy"])
+            if output_format == "mp3":
+                ffmpeg_cmd.extend(["-c:a", "libmp3lame", "-q:a", "2"]) # vbr mp3
+            elif output_format == "flac":
+                ffmpeg_cmd.extend(["-c:a", "flac"])
+            elif output_format == "wav":
+                ffmpeg_cmd.extend(["-c:a", "pcm_s16le"])
+            elif output_format == "opus":
+                ffmpeg_cmd.extend(["-c:a", "libopus"])
+            else: # for m4a, etc.
+                ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
 
         # add metadata
         metadata_args = []
@@ -136,29 +157,34 @@ async def download_and_merge(
             "-metadata", f"encoder=sodalite"
         ])
 
+        ffmpeg_cmd.extend(metadata_args)
+
         # output format specific options
         if output_format == "mp4":
-            ffmpeg_cmd.extend(["-movflags", "+faststart"]) # for better streaming
+            ffmpeg_cmd.extend(["-movflags", "+faststart"])  # optimize for streaming
 
         # add output
         ffmpeg_cmd.append(output_path)
 
-        # run ffmpeg
-        process = await asyncio.create_subprocess_exec(
-            *ffmpeg_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
+        # run ffmpeg using thread executor for Windows compatibility
+        def run_ffmpeg():
+            return subprocess.run(
+                ffmpeg_cmd,
+                capture_output=True,
+                text=True
+            )
 
-        stdout, stderr = await process.communicate()
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            result = await loop.run_in_executor(executor, run_ffmpeg)
 
-        if process.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed: {stderr.decode()}")
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg failed: {result.stderr}")
 
         return output_path
 
     finally:
-        # cleanup temporary files
+        # cleanup temp files
         for path in [video_path, audio_path]:
             if os.path.exists(path):
                 try:
@@ -201,10 +227,17 @@ async def merge_existing_files(
 
     ffmpeg_cmd.append(output_path)
 
-    process = await asyncio.create_subprocess_exec(
-        *ffmpeg_cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
+    # run ffmpeg using thread executor
+    def run_ffmpeg():
+        return subprocess.run(
+            ffmpeg_cmd,
+            capture_output=True,
+            text=True
+        )
 
-    await process.communicate()
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result = await loop.run_in_executor(executor, run_ffmpeg)
+
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed: {result.stderr}")

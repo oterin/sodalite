@@ -33,7 +33,8 @@ export interface ProcessRequest {
   url: string;
   video_quality?: string;
   audio_quality?: string;
-  format?: "mp4" | "webm" | "mkv";
+  format?: string;
+  download_mode?: "default" | "video_only" | "audio_only";
 }
 
 export interface ProcessResponse {

@@ -29,111 +29,71 @@ def create_ytdl_options() -> Dict[str, Any]:
     }
 
 def extract_formats_from_ytdl_info(info: Dict[str, Any]) -> tuple[List[Video], List[Audio]]:
-    """Extract video and audio formats from yt-dlp info dict."""
-    videos = []
-    audios = []
+    """Extract and de-duplicate video and audio formats from yt-dlp info dict."""
+
+    unique_videos: Dict[str, Video] = {}
+    unique_audios: Dict[str, Audio] = {}
 
     formats = info.get('formats', [])
 
     for fmt in formats:
         format_url = fmt.get('url')
-        if not format_url:
+        # Skip problematic formats
+        if not format_url or fmt.get('vcodec') == 'av01':
             continue
 
-        # Check format type
         vcodec = fmt.get('vcodec', 'none')
         acodec = fmt.get('acodec', 'none')
-        format_note = fmt.get('format_note', '')
-        quality = fmt.get('quality', 0)
 
-        if vcodec != 'none' and acodec == 'none':
-            # Video-only stream
+        # Video streams (including muxed)
+        if vcodec != 'none':
             height = fmt.get('height')
             width = fmt.get('width')
             fps = fmt.get('fps')
+            ext = fmt.get('ext')
 
-            # Build quality string
-            quality_str = format_note or f"{height}p" if height else "unknown"
+            if not height: continue
+
+            # Create a unique key for this quality
+            quality_key = f"{height}p"
             if fps and fps > 30:
-                quality_str += f"{fps}"
+                quality_key += f"{int(fps)}"
 
-            # Add format info if available
-            ext = fmt.get('ext', '')
-            if ext:
-                quality_str += f" ({ext})"
+            # Simple quality string
+            quality_str = quality_key
 
-            videos.append(Video(
-                url=format_url,
-                quality=quality_str,
-                width=width,
-                height=height
-            ))
+            # Prioritize mp4 over webm, and non-muxed over muxed for simplicity
+            if quality_key not in unique_videos or (ext == 'mp4' and not unique_videos[quality_key].quality.endswith('(video+audio)')):
+                unique_videos[quality_key] = Video(
+                    url=format_url,
+                    quality=quality_str,
+                    width=width,
+                    height=height
+                )
 
+        # Audio-only streams
         elif acodec != 'none' and vcodec == 'none':
-            # Audio-only stream
             abr = fmt.get('abr')
-            asr = fmt.get('asr')
-            ext = fmt.get('ext', '')
+            ext = fmt.get('ext')
 
-            # Build quality string
-            if abr:
-                quality_str = f"{int(abr)}kbps"
-            elif asr:
-                quality_str = f"{asr}Hz"
-            else:
-                quality_str = format_note or "unknown"
+            if not abr: continue
 
-            if ext:
-                quality_str += f" ({ext})"
+            quality_key = f"{int(abr)}kbps"
 
-            audios.append(Audio(
-                url=format_url,
-                quality=quality_str
-            ))
+            # Prioritize m4a/mp4a over others
+            if quality_key not in unique_audios or (ext == 'm4a'):
+                unique_audios[quality_key] = Audio(
+                    url=format_url,
+                    quality=quality_key
+                )
 
-        elif vcodec != 'none' and acodec != 'none':
-            # Combined video+audio stream
-            height = fmt.get('height')
-            width = fmt.get('width')
-            ext = fmt.get('ext', '')
-
-            quality_str = format_note or f"{height}p" if height else "unknown"
-            quality_str += " (muxed)"
-
-            if ext:
-                quality_str += f" ({ext})"
-
-            videos.append(Video(
-                url=format_url,
-                quality=quality_str,
-                width=width,
-                height=height
-            ))
-
-    # If no formats found, try to get the best single format
-    if not videos and not audios:
-        url = info.get('url')
-        if url:
-            height = info.get('height')
-            width = info.get('width')
-            ext = info.get('ext', '')
-            format_note = info.get('format', '')
-
-            quality_str = format_note or f"{height}p" if height else "best"
-            if ext:
-                quality_str += f" ({ext})"
-
-            videos.append(Video(
-                url=url,
-                quality=quality_str,
-                width=width,
-                height=height
-            ))
+    # Convert dicts to lists
+    videos = list(unique_videos.values())
+    audios = list(unique_audios.values())
 
     # Sort formats by quality (highest first)
-    videos.sort(key=lambda v: (v.height or 0, v.width or 0), reverse=True)
+    videos.sort(key=lambda v: (v.height or 0), reverse=True)
 
-    # Sort audio by bitrate (extract number from quality string)
     def extract_bitrate(quality: str) -> int:
         match = re.search(r'(\d+)kbps', quality)
         return int(match.group(1)) if match else 0
@@ -176,11 +136,22 @@ async def fetch_dl(url: str) -> SodaliteMetadata:
         videos, audios = extract_formats_from_ytdl_info(info)
         title, author, thumbnail_url = extract_metadata_from_ytdl_info(info)
 
+        # U0927KG2F97: Ensure thumbnail_url is None if not a string or not a valid URL
+        # SodaliteMetadata expects thumbnail_url as HttpUrl | None, so pass None if not a string or not a valid URL
+        from pydantic import HttpUrl, ValidationError
+
+        valid_thumbnail_url = None
+        if thumbnail_url:
+            try:
+                valid_thumbnail_url = HttpUrl.validate(thumbnail_url)
+            except (ValidationError, ValueError, TypeError):
+                valid_thumbnail_url = None
+
         return SodaliteMetadata(
             service="youtube",
             title=title,
             author=author,
-            thumbnail_url=thumbnail_url,
+            thumbnail_url=valid_thumbnail_url,
             videos=videos,
             audios=audios
         )

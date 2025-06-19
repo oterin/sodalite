@@ -85,8 +85,8 @@ def _parse_metadata_from_json(json_data: dict) -> SodaliteMetadata:
     if not media_data:
         raise InstagramReelsError("could not find media data in json structure")
 
-    videos: List[Video] = []
-    audios: List[Audio] = []
+    unique_videos: Dict[str, Video] = {}
+    unique_audios: Dict[str, Audio] = {}
 
     dash_manifest_xml = media_data.get("video_dash_manifest")
     if dash_manifest_xml:
@@ -104,20 +104,28 @@ def _parse_metadata_from_json(json_data: dict) -> SodaliteMetadata:
                     bandwidth = int(rep.get('bandwidth', 0))
 
                     if content_type == 'video':
-                        videos.append(Video(
-                            url=url,
-                            quality=f"{rep.get('height')}p",
-                            width=int(rep.get('width', 0)),
-                            height=int(rep.get('height', 0))
-                        ))
+                        height = int(rep.get('height', 0))
+                        quality_key = f"{height}p"
+                        if quality_key not in unique_videos:
+                            unique_videos[quality_key] = Video(
+                                url=url,
+                                quality=quality_key,
+                                width=int(rep.get('width', 0)),
+                                height=height
+                            )
                     elif content_type == 'audio':
-                        audios.append(Audio(
-                            url=url,
-                            quality=f"{bandwidth // 1000}kbps"
-                        ))
+                        quality_key = f"{bandwidth // 1000}kbps"
+                        if quality_key not in unique_audios:
+                            unique_audios[quality_key] = Audio(
+                                url=url,
+                                quality=quality_key
+                            )
         except ET.ParseError as e:
             print(f"Warning: Failed to parse XML manifest. Error: {e}")
             pass
+
+    videos = sorted(list(unique_videos.values()), key=lambda v: v.height or 0, reverse=True)
+    audios = sorted(list(unique_audios.values()), key=lambda a: int(a.quality.replace('kbps', '')), reverse=True)
 
     author = media_data.get("owner", {}).get("username", "unknown")
 

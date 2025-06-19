@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, Sparkles } from "lucide-react";
 import { detectService } from "@/lib/utils";
 
 const formSchema = z.object({
-  url: z.string().url("Please enter a valid URL").min(1, "URL is required"),
+  url: z
+    .string()
+    .url("that doesn't look like a valid url.")
+    .min(1, "you forgot to paste the link!"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -35,45 +38,58 @@ export function DownloadForm({ onSubmit, isLoading }: DownloadFormProps) {
 
   // watch url changes to detect service
   const urlValue = watch("url");
-  if (urlValue && detectService(urlValue) !== detectedService) {
-    setDetectedService(detectService(urlValue));
-  }
+  useEffect(() => {
+    const service = detectService(urlValue || "");
+    if (service !== detectedService) {
+      setDetectedService(service);
+    }
+  }, [urlValue, detectedService]);
 
   const onFormSubmit = async (data: FormData) => {
     await onSubmit(data.url);
   };
 
   return (
-    <Card className="p-6">
+    <Card className="p-6 sm:p-8 bg-card/95 backdrop-blur-sm border-border/50 shadow-lg">
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
         <div className="space-y-2">
-          <Input
-            {...register("url")}
-            placeholder="Paste your link here..."
-            className="text-lg h-12"
-            disabled={isLoading}
-            autoComplete="off"
-          />
+          <div className="relative">
+            <Input
+              {...register("url")}
+              placeholder="paste a link here..."
+              className="text-base h-12 px-4 rounded-lg bg-input/80 placeholder:text-muted-foreground/70 focus:bg-input"
+              disabled={isLoading}
+              autoComplete="off"
+            />
+          </div>
           {errors.url && (
-            <p className="text-sm text-destructive">{errors.url.message}</p>
+            <p className="text-sm text-destructive pl-1 animate-pop-in">
+              {errors.url.message}
+            </p>
           )}
           {detectedService && (
-            <p className="text-sm text-muted-foreground">
-              Detected: {detectedService}
+            <p className="flex items-center gap-2 text-sm text-primary pl-1 animate-pop-in">
+              <Sparkles className="h-4 w-4" />
+              {`ooh, ${detectedService.toLowerCase()}! great choice.`}
             </p>
           )}
         </div>
         <Button
           type="submit"
-          className="w-full h-12 text-lg"
-          disabled={isLoading}
+          className="w-full h-11 text-base rounded-lg font-medium"
+          disabled={isLoading || !watch("url")}
         >
           {isLoading ? (
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              looking for it...
+            </>
           ) : (
-            <Download className="mr-2 h-5 w-5" />
+            <>
+              <Download className="mr-2 h-4 w-4" />
+              fetch media
+            </>
           )}
-          {isLoading ? "Fetching..." : "Get Download Options"}
         </Button>
       </form>
     </Card>

@@ -3,41 +3,34 @@
 import { useState } from "react";
 import { DownloadForm } from "@/components/download-form";
 import { ServiceBadges } from "@/components/service-badges";
-import { DownloadProgress } from "@/components/download-progress";
-import { QualitySelector } from "@/components/quality-selector";
-import {
-  sodaliteAPI,
-  type DownloadMetadata,
-  type ProcessResponse,
-} from "@/lib/api";
+import { ResultsDialog } from "@/components/results-dialog";
+import { sodaliteAPI, type DownloadMetadata } from "@/lib/api";
 import { toast } from "sonner";
 import axios from "axios";
 
 export default function Home() {
   const [metadata, setMetadata] = useState<DownloadMetadata | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string>("");
-  const [task, setTask] = useState<ProcessResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleUrlSubmit = async (url: string) => {
     setIsLoading(true);
     setMetadata(null);
-    setTask(null);
     setCurrentUrl(url);
 
     try {
       const data = await sodaliteAPI.getDownloadInfo(url);
       setMetadata(data);
-      toast.success("Media found! Select quality to download.");
+      toast.success("found it! here are the details.");
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const errorMessage =
           error.response?.data?.detail?.error ||
           error.response?.data?.detail ||
-          "Failed to fetch media info";
+          "failed to fetch media information.";
         toast.error(errorMessage);
       } else {
-        toast.error("An unexpected error occurred");
+        toast.error("an unexpected error occurred.");
       }
       console.error("Error fetching download info:", error);
     } finally {
@@ -45,30 +38,36 @@ export default function Home() {
     }
   };
 
+  const handleReset = () => {
+    setMetadata(null);
+    setCurrentUrl("");
+  };
+
   return (
-    <div className="container relative mx-auto flex min-h-screen flex-col items-center justify-center px-4">
-      <div className="w-full max-w-2xl space-y-8">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl">
-            sodalite
-          </h1>
-          <p className="text-muted-foreground">
-            a simple downloader for the web
-          </p>
+    <>
+      <div className="container relative mx-auto flex min-h-screen flex-col items-center justify-center px-4 py-8">
+        <div className="w-full max-w-lg space-y-6">
+          <div className="text-center space-y-3 animate-fade-in">
+            <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight">
+              sodalite
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              a friendly media downloader
+            </p>
+          </div>
+
+          <div className="space-y-6 animate-slide-up">
+            <DownloadForm onSubmit={handleUrlSubmit} isLoading={isLoading} />
+            <ServiceBadges />
+          </div>
         </div>
-
-        <DownloadForm onSubmit={handleUrlSubmit} isLoading={isLoading} />
-        <ServiceBadges />
-
-        {metadata && (
-          <QualitySelector
-            metadata={metadata}
-            url={currentUrl}
-            onTaskCreated={setTask}
-          />
-        )}
-        {task && <DownloadProgress task={task} />}
       </div>
-    </div>
+
+      <ResultsDialog
+        metadata={metadata}
+        url={currentUrl}
+        onOpenChange={handleReset}
+      />
+    </>
   );
 }

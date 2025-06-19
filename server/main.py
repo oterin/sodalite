@@ -54,7 +54,8 @@ class ProcessRequest(BaseModel):
     url: HttpUrl
     video_quality: Optional[str] = None  # if None, use best
     audio_quality: Optional[str] = None  # if None, use best
-    format: Literal["mp4", "webm", "mkv"] = "mp4"
+    format: str = "mp4"
+    download_mode: Literal["default", "video_only", "audio_only"] = "default"
 
 class ProcessResponse(BaseModel):
     task_id: str
@@ -142,7 +143,8 @@ async def process_download_task(
             video_quality=request.video_quality,
             audio_quality=request.audio_quality,
             output_format=request.format,
-            output_dir=DOWNLOAD_DIR
+            output_dir=DOWNLOAD_DIR,
+            download_mode=request.download_mode
         )
 
         # update task status
@@ -153,6 +155,10 @@ async def process_download_task(
     except Exception as e:
         TASKS[task_id]["status"] = "failed"
         TASKS[task_id]["error"] = str(e)
+
+        # log for debugging rq
+        import traceback
+        traceback.print_exc()
 
 @app.post(
     "/api/download",
@@ -326,13 +332,22 @@ async def download_file(task_id: str):
     filename = "".join(c for c in filename if c.isalnum() or c in "._-") # sanitizing the filename (we don't want any funny business)
 
     # return the file response
+    media_type_map = {
+        "mp4": "video/mp4",
+        "webm": "video/webm",
+        "mkv": "video/x-matroska",
+        "mp3": "audio/mpeg",
+        "m4a": "audio/mp4"
+    }
+
+    file_format = task['request'].format
+    media_type = media_type_map.get(file_format, "application/octet-stream")
+
+
     return FileResponse(
         path=file_path,
         filename=filename,
-        media_type=(
-            "video/mp4" if task['request'].format == "mp4" else
-            f"video/{task['request'].format.replace(" (muxed)", "")}"
-        )
+        media_type=media_type
     )
 
 @app.get(

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:3000"; // Use relative paths for Vercel deployment
+const API_BASE_URL = "http://oter.hackclub.app:1337"; // Use relative paths for Vercel deployment
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

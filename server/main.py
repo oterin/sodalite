@@ -39,8 +39,7 @@ app = FastAPI(
 # cors middleware (because we like, need that lol)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # gonna need to change this in prod
-                         # but for now we chilling
+    allow_origins=["https://oter.hackclub.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]

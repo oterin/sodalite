@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 export default function Home() {
   const [metadata, setMetadata] = useState<DownloadMetadata | null>(null);
+  const [currentUrl, setCurrentUrl] = useState<string>("");
   const [task, setTask] = useState<ProcessResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,11 +22,12 @@ export default function Home() {
     setIsLoading(true);
     setMetadata(null);
     setTask(null);
+    setCurrentUrl(url);
 
     try {
       const data = await sodaliteAPI.getDownloadInfo(url);
       setMetadata(data);
-      toast.success("Meta found! Select quality to download.");
+      toast.success("Media found! Select quality to download.");
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.detail?.error || "Failed to fetch media info";
@@ -51,7 +53,11 @@ export default function Home() {
         <ServiceBadges />
 
         {metadata && (
-          <QualitySelector metadata={metadata} onTaskCreated={setTask} />
+          <QualitySelector
+            metadata={metadata}
+            url={currentUrl}
+            onTaskCreated={setTask}
+          />
         )}
         {task && <DownloadProgress task={task} />}
       </div>

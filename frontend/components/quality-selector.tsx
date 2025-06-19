@@ -28,10 +28,12 @@ import { toast } from "sonner";
 
 interface QualitySelectorProps {
   metadata: DownloadMetadata;
+  url: string;
   onTaskCreated: (task: ProcessResponse) => void;
 }
 
-export function QualitySelector({ metadata, onTaskCreated }: QualitySelectorProps) {
+export function QualitySelector({ metadata, url, onTaskCreated }: QualitySelectorProps) {
+  url: url;
   const [selectedVideo, setSelectedVideo] = useState<string | undefined>(
     metadata.videos[0]?.quality
   );

@@ -124,7 +124,7 @@ def _parse_metadata_from_json(json_data: dict) -> SodaliteMetadata:
     caption_node = media_data.get("caption")
     title = caption_node.get("text").split('\n')[0] if caption_node and caption_node.get("text") else f"Instagram Reel by {author}"
 
-    # thumbnail_url = media_data.get("image_versions2", {}).get("candidates", [{}])[0].get("url")
+    thumbnail_url = media_data.get("image_versions2", {}).get("candidates", [{}])[0].get("url")
 
     return SodaliteMetadata(
         service="instagram",

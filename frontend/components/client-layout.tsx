@@ -3,7 +3,7 @@
 import { DownloadManager } from "@/components/download-manager";
 import { GitInfo } from "@/components/git-info";
 import { HealthIndicator } from "@/components/health-indicator";
-import { Toaster, type ToasterProps } from "sonner";
+import { Toaster } from "sonner";
 
 export function ClientLayout() {
   return (

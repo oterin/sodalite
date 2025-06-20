@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Lora } from "next/font/google";
-import { Toaster } from "sonner";
+
 import { DownloadProvider } from "@/context/DownloadContext";
 import { HealthCheckProvider } from "@/context/HealthCheckContext";
 import { ClientLayout } from "@/components/client-layout";

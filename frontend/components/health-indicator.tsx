@@ -41,7 +41,7 @@ export function HealthIndicator() {
           <p className="text-muted-foreground">
             last heartbeat: {lastCheckedText}
           </p>
-          {isServerOnline && heartbeats !== null && (
+          {isServerOnline && typeof heartbeats === "number" && (
             <p className="text-muted-foreground">
               total heartbeats: {heartbeats.toLocaleString()}
             </p>

@@ -392,7 +392,9 @@ async def health_check():
     """
     health check endpoint
     """
-    return {"status": "ok"}
+    global heartbeat_count
+    heartbeat_count += 1
+    return {"status": "ok", "heartbeats": heartbeat_count}
 
 @app.get("/sodalite/git-info")
 async def git_info():

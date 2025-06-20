@@ -45,8 +45,9 @@ export default function Home() {
     setMetadata(null);
     setCurrentUrl("");
   };
+  const { isServerOnline, isConnecting } = useHealthCheck();
 
-  if (!isServerOnline) {
+  if (!isServerOnline && !isConnecting) {
     return <ServerStatus />;
   }
 

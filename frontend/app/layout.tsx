@@ -5,6 +5,7 @@ import { DownloadProvider } from "@/context/DownloadContext";
 import { HealthCheckProvider } from "@/context/HealthCheckContext";
 import { DownloadManager } from "@/components/download-manager";
 import { GitInfo } from "@/components/git-info";
+import { HealthIndicator } from "@/components/health-indicator";
 import "./globals.css";
 
 const inter = Inter({
@@ -51,6 +52,7 @@ export default function RootLayout({
             />
             <GitInfo />
           </DownloadProvider>
+          <HealthIndicator />
         </HealthCheckProvider>
       </body>
     </html>

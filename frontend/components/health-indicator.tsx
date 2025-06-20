@@ -29,8 +29,7 @@ export function HealthIndicator() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 select-none">
-      {/* Main Status Button */}
+    <div className="fixed top-4 right-4 z-40 select-none">
       <div
         onClick={() => isServerOnline && setIsExpanded(!isExpanded)}
         className={cn(
@@ -38,10 +37,9 @@ export function HealthIndicator() {
           "bg-card/80 backdrop-blur-sm border-border/30 shadow-sm",
           isServerOnline &&
             "cursor-pointer hover:bg-card/90 hover:border-border/50",
-          "w-28 sm:w-32", // Fixed width instead of min-width
+          "w-28 sm:w-32",
         )}
       >
-        {/* Status Dot */}
         <div
           className={cn(
             "h-2 w-2 rounded-full transition-colors shrink-0",
@@ -53,16 +51,14 @@ export function HealthIndicator() {
           )}
         />
 
-        {/* Status Text */}
         <span className="text-sm font-medium text-muted-foreground flex-1">
           {isServerOnline
-            ? "Online"
+            ? "online"
             : isConnecting
-              ? "Connecting..."
-              : "Offline"}
+              ? "connecting..."
+              : "offline"}
         </span>
 
-        {/* Expand/Collapse Icon */}
         {(isServerOnline || isConnecting) && (
           <div className="text-muted-foreground/60 shrink-0">
             {isExpanded ? (
@@ -74,29 +70,26 @@ export function HealthIndicator() {
         )}
       </div>
 
-      {/* Expanded Stats Panel */}
       {isExpanded && (isServerOnline || isConnecting) && (
         <div className="mt-2 p-4 rounded-lg border bg-card/90 backdrop-blur-sm border-border/30 shadow-lg animate-slide-up w-64 sm:w-72">
           <div className="space-y-3">
-            {/* Connecting message or stats */}
             {isConnecting ? (
               <div className="text-center py-4">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <div className="h-2 w-2 bg-yellow-600/80 rounded-full animate-pulse" />
                   <p className="text-sm text-muted-foreground">
-                    Connecting to server...
+                    connecting to server...
                   </p>
                 </div>
               </div>
             ) : (
               <>
-                {/* Heartbeats */}
                 {typeof heartbeats === "number" && (
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center gap-3">
                       <Activity className="h-4 w-4 text-muted-foreground/60" />
                       <span className="text-sm text-muted-foreground font-medium">
-                        Heartbeats
+                        heartbeats
                       </span>
                     </div>
                     <span className="text-sm font-mono text-foreground/80 font-medium">
@@ -105,13 +98,12 @@ export function HealthIndicator() {
                   </div>
                 )}
 
-                {/* Connected Clients */}
                 {typeof connectedClients === "number" && (
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center gap-3">
                       <Users className="h-4 w-4 text-muted-foreground/60" />
                       <span className="text-sm text-muted-foreground font-medium">
-                        Connected Clients
+                        connected clients
                       </span>
                     </div>
                     <span className="text-sm font-mono text-foreground/80 font-medium">
@@ -120,13 +112,12 @@ export function HealthIndicator() {
                   </div>
                 )}
 
-                {/* Total Conversions */}
                 {typeof totalConversions === "number" && (
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center gap-3">
                       <Download className="h-4 w-4 text-muted-foreground/60" />
                       <span className="text-sm text-muted-foreground font-medium">
-                        Total Downloads
+                        total downloads
                       </span>
                     </div>
                     <span className="text-sm font-mono text-foreground/80 font-medium">
@@ -135,13 +126,12 @@ export function HealthIndicator() {
                   </div>
                 )}
 
-                {/* Total Bandwidth */}
                 {typeof totalBandwidthMB === "number" && (
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center gap-3">
                       <HardDrive className="h-4 w-4 text-muted-foreground/60" />
                       <span className="text-sm text-muted-foreground font-medium">
-                        Total Bandwidth
+                        total bandwidth
                       </span>
                     </div>
                     <span className="text-sm font-mono text-foreground/80 font-medium">
@@ -155,10 +145,9 @@ export function HealthIndicator() {
             )}
           </div>
 
-          {/* Close hint */}
           <div className="mt-4 pt-3 border-t border-border/20">
             <p className="text-xs text-muted-foreground/60 text-center">
-              Tap to collapse
+              tap to collapse
             </p>
           </div>
         </div>

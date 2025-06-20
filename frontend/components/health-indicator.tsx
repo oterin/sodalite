@@ -2,7 +2,6 @@
 
 import { useHealthCheck } from "@/context/HealthCheckContext";
 import { cn } from "@/lib/utils";
-import { timeAgo } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,

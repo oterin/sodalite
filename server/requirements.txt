@@ -7,3 +7,4 @@ python-multipart
 aiofiles
 mutagen
 brotli
+GitPython

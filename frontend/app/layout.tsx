@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Lora } from "next/font/google";
 import { Toaster } from "sonner";
 import { DownloadProvider } from "@/context/DownloadContext";
+import { HealthCheckProvider } from "@/context/HealthCheckContext";
 import { DownloadManager } from "@/components/download-manager";
 import { GitInfo } from "@/components/git-info";
 import "./globals.css";
@@ -32,23 +33,25 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${lora.variable} font-sans antialiased`}
       >
-        <DownloadProvider>
-          <div className="flex min-h-screen flex-col">
-            <main className="flex-1 relative z-10">{children}</main>
-          </div>
-          <DownloadManager />
-          <Toaster
-            position="bottom-center"
-            theme="dark"
-            richColors
-            expand={false}
-            toastOptions={{
-              className:
-                "font-serif text-sm border-border/50 bg-card/95 backdrop-blur-sm",
-            }}
-          />
-          <GitInfo />
-        </DownloadProvider>
+        <HealthCheckProvider>
+          <DownloadProvider>
+            <div className="flex min-h-screen flex-col">
+              <main className="flex-1 relative z-10">{children}</main>
+            </div>
+            <DownloadManager />
+            <Toaster
+              position="bottom-center"
+              theme="dark"
+              richColors
+              expand={false}
+              toastOptions={{
+                className:
+                  "font-serif text-sm border-border/50 bg-card/95 backdrop-blur-sm",
+              }}
+            />
+            <GitInfo />
+          </DownloadProvider>
+        </HealthCheckProvider>
       </body>
     </html>
   );

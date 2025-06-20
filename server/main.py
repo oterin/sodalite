@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, Literal
+import git
 
 from server.helper.detector import detect_service
 from server.helper.errors import (
@@ -401,6 +402,31 @@ async def health_check():
         "ffmpeg_available": ffmpeg_available,
         "temp_dir": DOWNLOAD_DIR
     }
+
+@app.get("/sodalite/git-info")
+async def git_info():
+    """
+    get git information for the repo
+    """
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        branch = repo.active_branch.name
+        commit = repo.head.commit
+        commit_sha = commit.hexsha
+        commit_date = commit.committed_datetime.isoformat()
+        commit_message = commit.message.strip()
+
+        return {
+            "branch": branch,
+            "commit_sha": commit_sha,
+            "commit_date": commit_date,
+            "commit_message": commit_message
+        }
+    except git.InvalidGitRepositoryError:
+        raise HTTPException(status_code=500, detail="not a git repository")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"an error occurred: {str(e)}")
+
 
 @app.delete("/sodalite/task/{task_id}")
 async def cleanup_task(task_id: str):

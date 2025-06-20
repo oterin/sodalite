@@ -1,8 +1,13 @@
-import { GitBranch } from 'lucide-react';
+"use client";
 
-function timeAgo(timestamp: number): string {
-  const now = Date.now();
-  const seconds = Math.floor((now - timestamp) / 1000);
+import { useState, useEffect } from "react";
+import { GitBranch } from "lucide-react";
+import { sodaliteAPI, type GitInfo as GitInfoType } from "@/lib/api";
+
+function timeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (seconds < 60) return `${seconds}s ago`;
 
@@ -17,18 +22,30 @@ function timeAgo(timestamp: number): string {
 }
 
 export function GitInfo() {
-  const commitRef = process.env.VERCEL_GIT_COMMIT_REF;
-  const commitSha = process.env.VERCEL_GIT_COMMIT_SHA;
-  const commitTimestamp = process.env.VERCEL_GIT_COMMIT_TIMESTAMP;
+  const [gitInfo, setGitInfo] = useState<GitInfoType | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // These variables are only available on Vercel deployments
-  if (!commitRef || !commitSha || !commitTimestamp) {
+  useEffect(() => {
+    const fetchGitInfo = async () => {
+      try {
+        const data = await sodaliteAPI.getGitInfo();
+        setGitInfo(data);
+      } catch (err) {
+        console.error("Failed to fetch git info:", err);
+        setError("Could not load git information.");
+      }
+    };
+
+    fetchGitInfo();
+  }, []);
+
+  if (error || !gitInfo) {
     return null;
   }
 
-  const shortSha = commitSha.slice(0, 7);
-  const commitTime = timeAgo(Number(commitTimestamp) * 1000);
-  const githubUrl = `https://github.com/oterin/sodalite/commit/${commitSha}`;
+  const shortSha = gitInfo.commit_sha.slice(0, 7);
+  const commitTime = timeAgo(gitInfo.commit_date);
+  const githubUrl = `https://github.com/oterin/sodalite/commit/${gitInfo.commit_sha}`;
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
@@ -36,11 +53,12 @@ export function GitInfo() {
         href={githubUrl}
         target="_blank"
         rel="noopener noreferrer"
+        title={gitInfo.commit_message}
         className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 bg-card/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm"
       >
         <GitBranch className="h-3.5 w-3.5" />
         <span>
-          {commitRef} ({shortSha}) &ndash; {commitTime}
+          {gitInfo.branch} ({shortSha}) &ndash; {commitTime}
         </span>
       </a>
     </div>

@@ -43,6 +43,13 @@ export interface ProcessResponse {
   error?: string;
 }
 
+export interface GitInfo {
+  branch: string;
+  commit_sha: string;
+  commit_date: string;
+  commit_message: string;
+}
+
 export interface ErrorDetail {
   error: string;
   service?: string;
@@ -63,6 +70,16 @@ export const sodaliteAPI = {
 
   getTaskStatus: async (taskId: string): Promise<ProcessResponse> => {
     const response = await api.get(`/sodalite/task/${taskId}`);
+    return response.data;
+  },
+
+  getGitInfo: async (): Promise<GitInfo> => {
+    const response = await api.get("/sodalite/git-info");
+    return response.data;
+  },
+
+  healthCheck: async (): Promise<{ status: string }> => {
+    const response = await api.get("/sodalite/health");
     return response.data;
   },
 

@@ -7,8 +7,11 @@ import { ResultsDialog } from "@/components/results-dialog";
 import { sodaliteAPI, type DownloadMetadata } from "@/lib/api";
 import { toast } from "sonner";
 import axios from "axios";
+import { useHealthCheck } from "@/context/HealthCheckContext";
+import { ServerStatus } from "@/components/server-status";
 
 export default function Home() {
+  const { isServerOnline } = useHealthCheck();
   const [metadata, setMetadata] = useState<DownloadMetadata | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +45,10 @@ export default function Home() {
     setMetadata(null);
     setCurrentUrl("");
   };
+
+  if (!isServerOnline) {
+    return <ServerStatus />;
+  }
 
   return (
     <>

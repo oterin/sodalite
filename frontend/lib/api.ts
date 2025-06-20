@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://37.27.51.34:1335";
+const API_BASE_URL = "https://backend.otter.llc:1335";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

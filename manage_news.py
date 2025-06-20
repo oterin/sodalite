@@ -7,7 +7,7 @@ Manages UI updates and news announcements for the Sodalite frontend
 import json
 import argparse
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any
 
 # News types and their default configurations
@@ -109,7 +109,7 @@ def list_news_items(data: Dict[str, Any], show_expired: bool = False) -> None:
         print("📰 No news items found.")
         return
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     active_items = []
     expired_items = []
 
@@ -149,7 +149,7 @@ def remove_news_item(data: Dict[str, Any], item_id: str) -> bool:
 
 def cleanup_expired(data: Dict[str, Any]) -> int:
     """Remove expired news items"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     news_items = data.get("news", [])
     original_length = len(news_items)
 

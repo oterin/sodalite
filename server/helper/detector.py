@@ -25,6 +25,7 @@ def detect_service(url: str) -> str:
         "youtube.com/watch" in url
         or "youtu.be/" in url
         or "youtube.com/shorts" in url
+        or "music.youtube.com/" in url
     ):
         return "youtube"
 

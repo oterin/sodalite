@@ -161,6 +161,8 @@ async def download_and_merge(
         if audio:
             if output_format == "webm":
                 ffmpeg_cmd.extend(["-c:a", "libopus"])
+            elif output_format == "mp3":
+                ffmpeg_cmd.extend(["-c:a", "libmp3lame", "-b:a", "192k"])
             else:
                 ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
 

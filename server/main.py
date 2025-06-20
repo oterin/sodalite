@@ -315,7 +315,9 @@ def generate_cache_key(url: str) -> str:
 
 def is_cache_valid(entry: dict) -> bool:
     """check if cache entry is still valid (within 30 seconds)"""
-    cached_time = entry.get("cached_at", 0)
+    if "cached_at" not in entry:
+        return False
+    cached_time = entry["cached_at"]
     return time.time() - cached_time < CACHE_DURATION
 
 def get_cached_metadata(url: str) -> Optional[SodaliteMetadata]:

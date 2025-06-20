@@ -31,7 +31,6 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
   const [isConnecting, setIsConnecting] = useState<boolean>(true);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  // Use WebSocket for live stats updates
   const {
     heartbeats,
     connectedClients,
@@ -55,16 +54,14 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    // Check immediately on mount
     checkStatus();
 
-    // Then check every 30 seconds (less frequent since we have WebSocket)
+    // check every 30 seconds
     const intervalId = setInterval(checkStatus, 30000);
 
     return () => clearInterval(intervalId);
   }, []);
 
-  // Update server online status based on WebSocket connection
   useEffect(() => {
     if (isConnected) {
       setIsServerOnline(true);

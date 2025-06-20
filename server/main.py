@@ -35,6 +35,10 @@ from server.services import (
 )
 from server.helper.downloader import download_and_merge
 import aiohttp
+import asyncio
+
+download_semaphore = asyncio.Semaphore(2)
+DOWNLOAD_CLEANUP_DELAY_MINUTES = 5
 
 # sodalite app instance
 app = FastAPI(
@@ -86,18 +90,12 @@ TEMP_DIR = tempfile.gettempdir()
 DOWNLOAD_DIR = os.path.join(TEMP_DIR, "sodalite_downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# In-memory store for tasks (replace Vercel KV)
-# In a real-world scenario, this would ideally be a proper database or a persistent key-value store
-# as this will not persist across server restarts.
 tasks = {}
 
-# Global heartbeat counter
 heartbeat_count = 0
 
-# WebSocket connections for live heartbeat updates
 active_websockets: List[WebSocket] = []
 
-# Statistics tracking
 STATS_FILE = os.path.join(DOWNLOAD_DIR, "sodalite_stats.json")
 
 class Statistics:
@@ -151,7 +149,6 @@ class Statistics:
         except Exception as e:
             print(f"Failed to track download bandwidth: {e}")
 
-# Global statistics instance
 stats = Statistics()
 
 # file cleanup tracking
@@ -232,40 +229,41 @@ async def process_download_task(
     background task to download and merge the video and audio streams
     because most services LOOOOOOOVE to separate them for some odd fuCKING REASOn
     """
-    try:
-        # Update status in local tasks dictionary
-        tasks[task_id]["status"] = "processing"
+    # use a semaphore to limit concurrent downloads and processing
+    async with download_semaphore:
+        try:
+            tasks[task_id]["status"] = "processing"
 
-        # download and merge the streams
-        output_path = await download_and_merge(
-            metadata=metadata,
-            video_quality=request.video_quality,
-            audio_quality=request.audio_quality,
-            output_format=request.format,
-            output_dir=DOWNLOAD_DIR,
-            download_mode=request.download_mode
-        )
+            # download and merge the streams
+            output_path = await download_and_merge(
+                metadata=metadata,
+                video_quality=request.video_quality,
+                audio_quality=request.audio_quality,
+                output_format=request.format,
+                output_dir=DOWNLOAD_DIR,
+                download_mode=request.download_mode
+            )
 
-        # update task status
-        tasks[task_id].update({
-            "status": "completed",
-            "download_url": f"/sodalite/download/{task_id}/file",
-            "file_path": output_path
-        })
+            # update task status
+            tasks[task_id].update({
+                "status": "completed",
+                "download_url": f"/sodalite/download/{task_id}/file",
+                "file_path": output_path
+            })
 
-        # track conversion statistics
-        await stats.increment_conversion()
-        await broadcast_stats()
+            # track conversion statistics
+            await stats.increment_conversion()
+            await broadcast_stats()
 
-        # schedule file cleanup after 10 minutes
-        cleanup_file_after_delay(output_path, 10)
+            # schedule file cleanup with a shorter delay
+            cleanup_file_after_delay(output_path, DOWNLOAD_CLEANUP_DELAY_MINUTES)
 
-    except Exception as e:
-        tasks[task_id].update({"status": "failed", "error": str(e)})
+        except Exception as e:
+            tasks[task_id].update({"status": "failed", "error": str(e)})
 
-        # log for debugging rq
-        import traceback
-        traceback.print_exc()
+            # log for debugging rq
+            import traceback
+            traceback.print_exc()
 
 @app.post(
     "/sodalite/download",

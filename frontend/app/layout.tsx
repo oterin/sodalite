@@ -37,7 +37,6 @@ export default function RootLayout({
               <main className="flex-1 relative z-10">{children}</main>
             </div>
 
-            {/* All client-side, floating UI components are wrapped here */}
             <ClientLayout />
           </DownloadProvider>
         </HealthCheckProvider>

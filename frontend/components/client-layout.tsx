@@ -6,20 +6,18 @@ import { HealthIndicator } from "@/components/health-indicator";
 import { Toaster } from "sonner";
 
 /**
- * This component wraps all the floating, client-side UI elements
+ * this component wraps all the floating, client-side ui elements
  * that should persist across all pages.
  *
- * Each component handles its own positioning and visibility logic internally.
+ * each component handles its own positioning and visibility logic internally.
  */
 export function ClientLayout() {
   return (
     <>
-      {/* Persistent UI elements */}
       <GitInfo />
       <HealthIndicator />
       <DownloadManager />
 
-      {/* Toaster for notifications */}
       <Toaster
         position="bottom-center"
         theme="dark"

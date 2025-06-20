@@ -136,6 +136,10 @@ pull requests welcome! please:
 - [next.js](https://nextjs.org/) → react framework
 - [tailwindcss](https://tailwindcss.com/) → utility-first css
 
+## use of artificial intelligence
+this project does not use artificial intelligence in any of its components. the only instance of llm use is in refining the readme content, generating git commit messages and helping identify bugs and vulnerabilities. all code is written by the author.
+models used: gemini 2.5 pro, claude opus 4.
+
 ## 📄 license
 
 MIT License

@@ -89,15 +89,19 @@ async def download_and_merge(
         raise RuntimeError("ffmpeg is not installed or not in PATH. Please install ffmpeg.")
 
     if output_dir is None:
+        # Use system temp for final output if not specified, but intermediate files will be in a dedicated safe temp dir
         output_dir = tempfile.gettempdir()
 
-    # create unique filenames
-    base_name = f"{metadata.service}_{hash(metadata.title)}"
-    video_path = os.path.join(output_dir, f"{base_name}_video.tmp")
-    audio_path = os.path.join(output_dir, f"{base_name}_audio.tmp")
-    output_path = os.path.join(output_dir, f"{base_name}_final.{output_format}")
+    # Use a temporary directory for intermediate files to ensure they are cleaned up
+    with tempfile.TemporaryDirectory(prefix="sodalite_") as temp_dir:
+        # create unique filenames for intermediate files in the temp directory
+        base_name = f"{metadata.service}_{hash(metadata.title)}"
+        video_path = os.path.join(temp_dir, f"{base_name}_video.tmp")
+        audio_path = os.path.join(temp_dir, f"{base_name}_audio.tmp")
 
-    try:
+        # final output path remains in the user-specified or default output_dir
+        output_path = os.path.join(output_dir, f"{base_name}_final.{output_format}")
+
         # get best streams
         video, audio = get_best_streams(metadata, video_quality, audio_quality)
 
@@ -137,16 +141,25 @@ async def download_and_merge(
         # if we have both video and audio, merge them
         if video and audio and os.path.exists(video_path) and os.path.exists(audio_path):
             ffmpeg_cmd.extend(["-c:v", "copy"])
-            if output_format == "webm":
-                ffmpeg_cmd.extend(["-c:a", "libopus"]) # webm requires opus/vorbis
+
+            # Smart audio codec selection to avoid transcoding
+            if (output_format in ('mp4', 'm4a') and audio.codec and 'aac' in audio.codec.lower()) or \
+               (output_format == 'webm' and audio.codec and ('opus' in audio.codec.lower() or 'vorbis' in audio.codec.lower())):
+                ffmpeg_cmd.extend(["-c:a", "copy"])
+            elif output_format == 'webm':
+                ffmpeg_cmd.extend(["-c:a", "libopus"])  # webm requires opus or vorbis
             else:
-                ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
+                ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k"]) # default to aac for mp4/m4a
         elif video and os.path.exists(video_path):
             # video only
             ffmpeg_cmd.extend(["-c:v", "copy"])
         elif audio and os.path.exists(audio_path):
             # audio only
-            if output_format == "mp3":
+            # Optimize to copy codec if compatible to save resources
+            if (output_format in ["m4a", "mp4"] and audio.codec and "aac" in audio.codec.lower()) or \
+               (output_format == "opus" and audio.codec and "opus" in audio.codec.lower()):
+                ffmpeg_cmd.extend(["-c:a", "copy"])
+            elif output_format == "mp3":
                 ffmpeg_cmd.extend(["-c:a", "libmp3lame", "-q:a", "2"]) # vbr mp3
             elif output_format == "flac":
                 ffmpeg_cmd.extend(["-c:a", "flac"])
@@ -193,15 +206,6 @@ async def download_and_merge(
             raise RuntimeError(f"ffmpeg failed: {result.stderr}")
 
         return output_path
-
-    finally:
-        # cleanup temp files
-        for path in [video_path, audio_path]:
-            if os.path.exists(path):
-                try:
-                    os.remove(path)
-                except:
-                    pass
 
 async def merge_existing_files(
     video_path: Optional[str],

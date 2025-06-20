@@ -137,8 +137,8 @@ pull requests welcome! please:
 - [tailwindcss](https://tailwindcss.com/) → utility-first css
 
 ## use of artificial intelligence
-this project does not use artificial intelligence in any of its components. the only instance of llm use is in refining the readme content, generating git commit messages and helping identify bugs and vulnerabilities. all code is written by the author.
-models used: gemini 2.5 pro, claude opus 4.
+this project primarily relies on traditional programming approaches. artificial intelligence tools have been utilized in various supporting capacities throughout the development process. all core functionality is human-authored.
+models used: claude opus 4, gemini 2.5 pro.
 
 ## 📄 license
 

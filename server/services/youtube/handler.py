@@ -28,10 +28,10 @@ def create_ytdl_options() -> Dict[str, Any]:
         'writeautomaticsub': False,
     }
 
-    # Add cookies.txt if it exists in the same directory
-    cookies_path = 'cookies.txt'
+    # Add cookies.txt if it exists in the same directory (Netscape format)
+    cookies_path = 'server/services/youtube/cookies.txt'
     if os.path.exists(cookies_path):
-        print(f"Using cookies from {cookies_path}")
+        print(f"Using cookies from {cookies_path} (Netscape format)")
         options['cookiefile'] = cookies_path
 
     return options

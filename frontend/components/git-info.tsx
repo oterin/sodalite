@@ -48,7 +48,7 @@ export function GitInfo() {
   const githubUrl = `https://github.com/oterin/sodalite/commit/${gitInfo.commit_sha}`;
 
   return (
-    <div className="fixed top-4 left-4 z-30">
+    <div className="fixed bottom-4 left-4 z-30">
       <a
         href={githubUrl}
         target="_blank"

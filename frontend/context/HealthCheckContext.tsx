@@ -30,11 +30,10 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
         const data = await sodaliteAPI.healthCheck();
         setIsServerOnline(true);
         setHeartbeats(data.heartbeats);
+        setLastChecked(new Date());
       } catch (error) {
         // we can safely assume a failed request means the server is offline
         setIsServerOnline(false);
-      } finally {
-        setLastChecked(new Date());
       }
     };
 

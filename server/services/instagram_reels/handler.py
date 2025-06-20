@@ -4,15 +4,15 @@ sodalite service for instagram reels
 
 from server.helper.errors import InstagramReelsError
 from server.models.metadata import SodaliteMetadata, Video, Audio
-from typing import List, Optional
+from typing import Dict, Optional
 import aiohttp
 import re
 import json
 import xml.etree.ElementTree as ET
-import html
+import asyncio
 
-async def _get_raw_data(url: str) -> str:
-    """fetches the raw html from the instagram reels url"""
+async def _get_raw_data(url: str, retry_count: int = 3) -> str:
+    """fetches the raw html from the instagram reels url with retry logic"""
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'accept-encoding': 'gzip, deflate, br',
@@ -36,11 +36,24 @@ async def _get_raw_data(url: str) -> str:
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
         'viewport-width': '150'
     }
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as response:
-            if not response.ok:
-                raise InstagramReelsError(f"failed to fetch data from {url}")
-            return await response.text(encoding='utf-8', errors='ignore')
+
+    for attempt in range(retry_count):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    if not response.ok:
+                        if attempt < retry_count - 1:
+                            await asyncio.sleep(1)  # Wait 1 second before retry
+                            continue
+                        raise InstagramReelsError(f"failed to fetch data from {url}")
+                    return await response.text(encoding='utf-8', errors='ignore')
+        except Exception as e:
+            if attempt < retry_count - 1:
+                await asyncio.sleep(1)  # Wait 1 second before retry
+                continue
+            raise InstagramReelsError(f"failed to fetch data from {url}: {str(e)}")
+
+    raise InstagramReelsError(f"failed to fetch data from {url} after {retry_count} attempts")
 
 def _extract_json_from_raw_data(raw_data: str) -> dict:
     """extracts the main json data blob from the raw html"""
@@ -50,6 +63,7 @@ def _extract_json_from_raw_data(raw_data: str) -> dict:
     if not matches:
         raise InstagramReelsError("could not find any data-sjs json script tags in the response")
 
+    # First try to find a script tag with video_dash_manifest
     for match_content in matches:
         if '"video_dash_manifest"' in match_content:
             try:
@@ -57,13 +71,26 @@ def _extract_json_from_raw_data(raw_data: str) -> dict:
             except json.JSONDecodeError:
                 continue
 
+    # If that fails, try to parse all script tags and look for media data
+    for match_content in matches:
+        try:
+            parsed_data = json.loads(match_content)
+            # Check if this JSON contains media data
+            if _find_media_data(parsed_data):
+                return parsed_data
+        except json.JSONDecodeError:
+            continue
+
     raise InstagramReelsError("could not find the correct media data json in any of the script tags")
 
 def _find_media_data(data: dict) -> Optional[dict]:
     """recursively search for the main media data blob in the json"""
     if isinstance(data, dict):
-        required_keys = ['video_dash_manifest', 'owner', 'image_versions2', 'caption', 'pk']
-        if all(key in data for key in required_keys):
+        # Check for required keys - some might be optional
+        required_keys = ['owner', 'pk']
+        optional_keys = ['video_dash_manifest', 'image_versions2', 'caption']
+
+        if all(key in data for key in required_keys) and any(key in data for key in optional_keys):
             return data
 
         for value in data.values():

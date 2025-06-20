@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Lora } from "next/font/google";
-
-import { DownloadProvider } from "@/context/DownloadContext";
 import { HealthCheckProvider } from "@/context/HealthCheckContext";
+import { DownloadProvider } from "@/context/DownloadContext";
 import { ClientLayout } from "@/components/client-layout";
 import "./globals.css";
 
@@ -37,9 +36,8 @@ export default function RootLayout({
             <div className="flex min-h-screen flex-col">
               <main className="flex-1 relative z-10">{children}</main>
             </div>
-            <div className="flex min-h-screen flex-col">
-              <main className="flex-1 relative z-10">{children}</main>
-            </div>
+
+            {/* All client-side, floating UI components are wrapped here */}
             <ClientLayout />
           </DownloadProvider>
         </HealthCheckProvider>

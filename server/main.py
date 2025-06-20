@@ -39,7 +39,7 @@ app = FastAPI(
 # cors middleware (because we like, need that lol)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://oter.hackclub.app"],
+    allow_origins=["https://backend.otter.llc", "https://sodalite.otter.llc"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]

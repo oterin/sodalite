@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 import { DownloadProvider } from "@/context/DownloadContext";
 import { HealthCheckProvider } from "@/context/HealthCheckContext";
 import { DownloadManager } from "@/components/download-manager";
-
+import { GitInfo } from "@/components/git-info";
 import { HealthIndicator } from "@/components/health-indicator";
 import "./globals.css";
 
@@ -40,7 +40,6 @@ export default function RootLayout({
               <main className="flex-1 relative z-10">{children}</main>
             </div>
             <DownloadManager />
-            <HealthIndicator />
             <Toaster
               position="bottom-center"
               theme="dark"

@@ -170,9 +170,28 @@ def _parse_metadata_from_json(json_data: dict) -> SodaliteMetadata:
         audios=audios
     )
 
-async def fetch_dl(url: str) -> SodaliteMetadata:
-    """takes in a raw instagram reels url, and returns the metadata"""
-    raw_data = await _get_raw_data(url)
-    json_data = _extract_json_from_raw_data(raw_data)
-    metadata = _parse_metadata_from_json(json_data)
-    return metadata
+async def fetch_dl(url: str, retry_count: int = 3) -> SodaliteMetadata:
+    """takes in a raw instagram reels url, and returns the metadata with retry logic"""
+    last_error = None
+
+    for attempt in range(retry_count):
+        try:
+            raw_data = await _get_raw_data(url)
+            json_data = _extract_json_from_raw_data(raw_data)
+            metadata = _parse_metadata_from_json(json_data)
+            return metadata
+        except InstagramReelsError as e:
+            last_error = e
+            if "could not find the correct media data json" in str(e) or "could not find media data in json structure" in str(e):
+                if attempt < retry_count - 1:
+                    await asyncio.sleep(1)  # Wait 1 second before retry
+                    continue
+            raise e
+        except Exception as e:
+            last_error = e
+            if attempt < retry_count - 1:
+                await asyncio.sleep(1)  # Wait 1 second before retry
+                continue
+            raise e
+
+    raise last_error or InstagramReelsError(f"failed to fetch metadata after {retry_count} attempts")

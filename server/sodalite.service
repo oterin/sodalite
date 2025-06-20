@@ -1,0 +1,31 @@
+[Unit]
+Description=Sodalite Media Downloader Server
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+User=sodalite
+Group=sodalite
+WorkingDirectory=/opt/sodalite/server
+Environment=PATH=/opt/sodalite/venv/bin
+ExecStart=/opt/sodalite/venv/bin/python /opt/sodalite/server/run.py
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+NoNewPrivileges=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sodalite
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

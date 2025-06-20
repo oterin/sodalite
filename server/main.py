@@ -9,12 +9,15 @@ import json
 from datetime import datetime, timedelta
 from pydantic.json import pydantic_encoder
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 import git
+import asyncio
+import json
+import aiofiles
 
 from server.helper.detector import detect_service
 from server.helper.errors import (
@@ -88,6 +91,55 @@ tasks = {}
 # Global heartbeat counter
 heartbeat_count = 0
 
+# WebSocket connections for live heartbeat updates
+active_websockets: List[WebSocket] = []
+
+# Statistics tracking
+STATS_FILE = os.path.join(DOWNLOAD_DIR, "sodalite_stats.json")
+
+class Statistics:
+    def __init__(self):
+        self.total_conversions = 0
+        self.total_bandwidth_bytes = 0
+        self.load_from_file()
+
+    def load_from_file(self):
+        """Load stats from file if it exists"""
+        try:
+            if os.path.exists(STATS_FILE):
+                with open(STATS_FILE, 'r') as f:
+                    data = json.load(f)
+                    self.total_conversions = data.get('total_conversions', 0)
+                    self.total_bandwidth_bytes = data.get('total_bandwidth_bytes', 0)
+        except Exception as e:
+            print(f"Failed to load stats: {e}")
+
+    async def save_to_file(self):
+        """Save stats to file"""
+        try:
+            data = {
+                'total_conversions': self.total_conversions,
+                'total_bandwidth_bytes': self.total_bandwidth_bytes,
+                'last_updated': datetime.now().isoformat()
+            }
+            async with aiofiles.open(STATS_FILE, 'w') as f:
+                await f.write(json.dumps(data, indent=2))
+        except Exception as e:
+            print(f"Failed to save stats: {e}")
+
+    async def increment_conversion(self):
+        """Increment conversion count and save"""
+        self.total_conversions += 1
+        await self.save_to_file()
+
+    async def add_bandwidth(self, bytes_count: int):
+        """Add to bandwidth usage and save"""
+        self.total_bandwidth_bytes += bytes_count
+        await self.save_to_file()
+
+# Global statistics instance
+stats = Statistics()
+
 # service mapping (should be extensible 💐)
 SERVICE_HANDLERS = {
     "instagram_reels": instagram_reels.fetch_dl,
@@ -160,6 +212,10 @@ async def process_download_task(
             "download_url": f"/sodalite/download/{task_id}/file",
             "file_path": output_path
         })
+
+        # track conversion statistics
+        await stats.increment_conversion()
+        await broadcast_stats()
 
     except Exception as e:
         tasks[task_id].update({"status": "failed", "error": str(e)})
@@ -359,6 +415,11 @@ async def download_file(task_id: str):
     filename = f"{metadata.title[:50]}_{metadata.author[:30]}.{request_obj.format}".replace(" ", "_").replace("/", "_")
     filename = "".join(c for c in filename if c.isalnum() or c in "._-") # sanitizing the filename (we don't want any funny business)
 
+    # track bandwidth usage
+    file_size = os.path.getsize(file_path)
+    await stats.add_bandwidth(file_size)
+    await broadcast_stats()
+
     # return the file response
     media_type_map = {
         "mp4": "video/mp4",
@@ -387,6 +448,28 @@ async def list_services():
     """
     return ServicesResponse(services=SERVICE_INFO)
 
+async def broadcast_stats():
+    """broadcast stats to all connected websockets"""
+    if active_websockets:
+        message = json.dumps({
+            "type": "stats",
+            "heartbeats": heartbeat_count,
+            "connected_clients": len(active_websockets),
+            "total_conversions": stats.total_conversions,
+            "total_bandwidth_mb": round(stats.total_bandwidth_bytes / (1024 * 1024), 2)
+        })
+        disconnected = []
+        for websocket in active_websockets:
+            try:
+                await websocket.send_text(message)
+            except:
+                disconnected.append(websocket)
+
+        # Remove disconnected websockets
+        for ws in disconnected:
+            if ws in active_websockets:
+                active_websockets.remove(ws)
+
 @app.get("/sodalite/health")
 async def health_check():
     """
@@ -394,7 +477,45 @@ async def health_check():
     """
     global heartbeat_count
     heartbeat_count += 1
-    return {"status": "ok", "heartbeats": heartbeat_count}
+
+    # Broadcast to all connected websockets
+    await broadcast_stats()
+
+    return {
+        "status": "ok",
+        "heartbeats": heartbeat_count,
+        "connected_clients": len(active_websockets),
+        "total_conversions": stats.total_conversions,
+        "total_bandwidth_mb": round(stats.total_bandwidth_bytes / (1024 * 1024), 2)
+    }
+
+@app.websocket("/ws/heartbeat")
+async def websocket_heartbeat(websocket: WebSocket):
+    """websocket endpoint for live heartbeat updates"""
+    await websocket.accept()
+    active_websockets.append(websocket)
+
+    try:
+        # Send current stats immediately
+        await websocket.send_text(json.dumps({
+            "type": "stats",
+            "heartbeats": heartbeat_count,
+            "connected_clients": len(active_websockets),
+            "total_conversions": stats.total_conversions,
+            "total_bandwidth_mb": round(stats.total_bandwidth_bytes / (1024 * 1024), 2)
+        }))
+
+        # Broadcast updated client count to all
+        await broadcast_stats()
+
+        # Keep connection alive
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        if websocket in active_websockets:
+            active_websockets.remove(websocket)
+        # Broadcast updated client count
+        await broadcast_stats()
 
 @app.get("/sodalite/git-info")
 async def git_info():

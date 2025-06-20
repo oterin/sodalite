@@ -8,46 +8,74 @@ import {
   ReactNode,
 } from "react";
 import { sodaliteAPI } from "@/lib/api";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface HealthCheckContextType {
   isServerOnline: boolean;
   lastChecked: Date | null;
   heartbeats: number | null;
+  connectedClients: number | null;
+  totalConversions: number | null;
+  totalBandwidthMB: number | null;
 }
 
 const HealthCheckContext = createContext<HealthCheckContextType | undefined>(
   undefined,
 );
 
+const WS_URL = "wss://backend.otter.llc:1335/ws/heartbeat";
+
 export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
-  const [isServerOnline, setIsServerOnline] = useState<boolean>(true);
+  const [isServerOnline, setIsServerOnline] = useState<boolean>(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  const [heartbeats, setHeartbeats] = useState<number | null>(null);
+
+  // Use WebSocket for live stats updates
+  const {
+    heartbeats,
+    connectedClients,
+    totalConversions,
+    totalBandwidthMB,
+    isConnected,
+  } = useWebSocket(WS_URL);
 
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const data = await sodaliteAPI.healthCheck();
-        setIsServerOnline(true);
-        setHeartbeats(data.heartbeats);
-        setLastChecked(new Date());
+        if (data && data.status === "ok") {
+          setIsServerOnline(true);
+          setLastChecked(new Date());
+        }
       } catch (error) {
         setIsServerOnline(false);
-        // Don't update lastChecked when offline - keep the last successful time
       }
     };
 
     // Check immediately on mount
     checkStatus();
 
-    // Then check every 10 seconds
-    const intervalId = setInterval(checkStatus, 10000);
+    // Then check every 30 seconds (less frequent since we have WebSocket)
+    const intervalId = setInterval(checkStatus, 30000);
 
-    // Cleanup on unmount
     return () => clearInterval(intervalId);
   }, []);
 
-  const value = { isServerOnline, lastChecked, heartbeats };
+  // Update server online status based on WebSocket connection
+  useEffect(() => {
+    if (isConnected) {
+      setIsServerOnline(true);
+      setLastChecked(new Date());
+    }
+  }, [isConnected]);
+
+  const value = {
+    isServerOnline,
+    lastChecked,
+    heartbeats,
+    connectedClients,
+    totalConversions,
+    totalBandwidthMB,
+  };
 
   return (
     <HealthCheckContext.Provider value={value}>

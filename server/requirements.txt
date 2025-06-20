@@ -8,3 +8,4 @@ aiofiles
 mutagen
 brotli
 GitPython
+websockets

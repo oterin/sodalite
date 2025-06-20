@@ -3,16 +3,16 @@
   "last_updated": "2025-06-20T14:07:07.502553Z",
   "news": [
     {
-      "id": "update-2025-06-20-resolved",
+      "id": "update-2025-06-21-service-outage",
       "type": "update",
-      "severity": "low",
-      "title": "Backend Service Restored",
-      "message": "The backend service disruption has been resolved. All services are now operating normally. Thank you for your patience during this outage.",
+      "severity": "medium",
+      "title": "youtube doesn't work",
+      "message": "due to youtube adding weird authentication tokens it won't work, wait for yt-dlp update",
       "timestamp": "2025-06-20T14:07:07.502432Z",
       "expires": "2025-06-21T14:07:07.502432Z",
       "show_when_offline": false,
-      "icon": "check-circle",
-      "color": "success"
+      "icon": "wrench",
+      "color": "warning"
     }
   ]
 }

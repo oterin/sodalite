@@ -6,7 +6,6 @@ import {
   useState,
   useEffect,
   ReactNode,
-  useRef,
 } from "react";
 import { sodaliteAPI } from "@/lib/api";
 
@@ -24,7 +23,6 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
   const [isServerOnline, setIsServerOnline] = useState<boolean>(true);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [heartbeats, setHeartbeats] = useState<number | null>(null);
-  const lastSuccessfulCheck = useRef<Date | null>(null);
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -32,21 +30,10 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
         const data = await sodaliteAPI.healthCheck();
         setIsServerOnline(true);
         setHeartbeats(data.heartbeats);
-
-        // Update both refs to the same timestamp
-        const now = new Date();
-        lastSuccessfulCheck.current = now;
-        setLastChecked(now);
+        setLastChecked(new Date());
       } catch (error) {
-        // Server is offline, but keep the last successful heartbeat time
         setIsServerOnline(false);
-        // Don't update lastChecked - it should show when we last successfully connected
-        // Only update if we've never connected before
-        if (lastSuccessfulCheck.current === null) {
-          setLastChecked(new Date());
-        } else {
-          setLastChecked(lastSuccessfulCheck.current);
-        }
+        // Don't update lastChecked when offline - keep the last successful time
       }
     };
 

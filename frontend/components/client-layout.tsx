@@ -5,16 +5,21 @@ import { GitInfo } from "@/components/git-info";
 import { HealthIndicator } from "@/components/health-indicator";
 import { Toaster } from "sonner";
 
+/**
+ * This component wraps all the floating, client-side UI elements
+ * that should persist across all pages.
+ *
+ * Each component handles its own positioning and visibility logic internally.
+ */
 export function ClientLayout() {
   return (
     <>
+      {/* Persistent UI elements */}
+      <GitInfo />
+      <HealthIndicator />
       <DownloadManager />
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-        <div className="flex items-center gap-4 px-3 py-1.5 bg-card/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm">
-          <GitInfo />
-          <HealthIndicator />
-        </div>
-      </div>
+
+      {/* Toaster for notifications */}
       <Toaster
         position="bottom-center"
         theme="dark"

@@ -3,16 +3,16 @@
   "last_updated": "2025-06-20T14:07:07.502553Z",
   "news": [
     {
-      "id": "outage-2025-06-20-140707",
-      "type": "outage",
-      "severity": "critical",
-      "title": "Backend Service Unavailable",
-      "message": "The backend is currently experiencing a service disruption caused by an issue with one of the third-party providers. I am actively working to resolve this, but I cannot provide an estimated time for service restoration at this moment.",
+      "id": "update-2025-06-20-resolved",
+      "type": "update",
+      "severity": "low",
+      "title": "Backend Service Restored",
+      "message": "The backend service disruption has been resolved. All services are now operating normally. Thank you for your patience during this outage.",
       "timestamp": "2025-06-20T14:07:07.502432Z",
       "expires": "2025-06-21T14:07:07.502432Z",
-      "show_when_offline": true,
-      "icon": "alert-triangle",
-      "color": "destructive"
+      "show_when_offline": false,
+      "icon": "check-circle",
+      "color": "success"
     }
   ]
 }

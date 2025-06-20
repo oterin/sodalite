@@ -9,12 +9,15 @@ import { toast } from "sonner";
 import axios from "axios";
 import { useHealthCheck } from "@/context/HealthCheckContext";
 import { ServerStatus } from "@/components/server-status";
+import { NewsBanner } from "@/components/news-banner";
 
 export default function Home() {
   const [metadata, setMetadata] = useState<DownloadMetadata | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const { isServerOnline, isConnecting } = useHealthCheck();
+
+  // Show the offline page only when not in the initial connecting state
   const isOffline = !isServerOnline && !isConnecting;
 
   const handleUrlSubmit = async (url: string) => {
@@ -50,6 +53,11 @@ export default function Home() {
   return (
     <>
       <div className="container relative mx-auto flex min-h-screen flex-col items-center justify-center px-4 py-8">
+        {/* Absolute container for the news banner */}
+        <div className="absolute top-8 left-4 right-4 z-10 mx-auto max-w-lg">
+          <NewsBanner isServerOnline={isServerOnline} />
+        </div>
+
         <div className="w-full max-w-lg space-y-6">
           {isOffline ? (
             <ServerStatus />

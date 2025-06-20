@@ -1,6 +1,10 @@
 import axios from "axios";
 
-const API_BASE_URL = "https://backend.otter.llc:1335";
+const API_BASE_URL = "http://localhost:1335";
+const WS_BASE_URL = API_BASE_URL.replace("https://", "wss://").replace(
+  "http://",
+  "ws://",
+);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,23 +13,23 @@ export const api = axios.create({
   },
 });
 
-export interface DownloadMetadata {
+export const getWebSocketUrl = (path: string): string => {
+  return `${WS_BASE_URL}${path}`;
+};
+
+export interface SanitizedDownloadMetadata {
   service: string;
   title: string;
   author: string;
   thumbnail_url?: string;
   videos: Array<{
-    url: string;
     quality: string;
     width?: number;
     height?: number;
-    headers?: Record<string, string>;
     codec?: string;
   }>;
   audios: Array<{
-    url: string;
     quality: string;
-    headers?: Record<string, string>;
     codec?: string;
   }>;
 }
@@ -45,6 +49,12 @@ export interface ProcessResponse {
   error?: string;
 }
 
+export interface TaskPhase {
+  task_id: string;
+  phase: "initializing" | "downloading" | "processing" | "completed" | "failed";
+  status: "processing" | "completed" | "failed";
+}
+
 export interface GitInfo {
   branch: string;
   commit_sha: string;
@@ -58,7 +68,7 @@ export interface ErrorDetail {
 }
 
 export const sodaliteAPI = {
-  getDownloadInfo: async (url: string): Promise<DownloadMetadata> => {
+  getDownloadInfo: async (url: string): Promise<SanitizedDownloadMetadata> => {
     const response = await api.post("/sodalite/download", { url });
     return response.data;
   },
@@ -72,6 +82,11 @@ export const sodaliteAPI = {
 
   getTaskStatus: async (taskId: string): Promise<ProcessResponse> => {
     const response = await api.get(`/sodalite/task/${taskId}`);
+    return response.data;
+  },
+
+  getTaskPhase: async (taskId: string): Promise<TaskPhase> => {
+    const response = await api.get(`/sodalite/task/${taskId}/phase`);
     return response.data;
   },
 

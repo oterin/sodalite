@@ -31,3 +31,24 @@ class SodaliteMetadata(BaseModel):
     thumbnail_url: Optional[HttpUrl] = None
     videos: List[Video] = []
     audios: List[Audio] = []
+
+class SanitizedVideo(BaseModel):
+    """a video download option without sensitive info"""
+    quality: str
+    width: Optional[int] = None
+    height: Optional[int] = None
+    codec: Optional[str] = None
+
+class SanitizedAudio(BaseModel):
+    """an audio download option without sensitive info"""
+    quality: str
+    codec: Optional[str] = None
+
+class SanitizedSodaliteMetadata(BaseModel):
+    """sanitized metadata for API response"""
+    service: str
+    title: str
+    author: str
+    thumbnail_url: Optional[HttpUrl] = None
+    videos: List[SanitizedVideo] = []
+    audios: List[SanitizedAudio] = []

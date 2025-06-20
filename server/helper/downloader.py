@@ -8,10 +8,17 @@ import aiohttp
 import tempfile
 import subprocess
 import concurrent.futures
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable
 from server.models.metadata import SodaliteMetadata, Video, Audio
+import time
+import re
 
-async def download_stream(url: str, output_path: str, headers: Optional[dict] = None) -> int:
+async def download_stream(
+    url: str,
+    output_path: str,
+    headers: Optional[dict] = None,
+    progress_callback: Optional[Callable[[int, int], None]] = None
+) -> int:
     """
     download a stream to a file and return bytes downloaded
     """
@@ -21,16 +28,25 @@ async def download_stream(url: str, output_path: str, headers: Optional[dict] = 
     })
 
     total_bytes = 0
+    downloaded_bytes = 0
+
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as response:
             response.raise_for_status()
 
+            content_length = response.headers.get('Content-Length')
+            if content_length:
+                total_bytes = int(content_length)
+
             with open(output_path, 'wb') as file:
                 async for chunk in response.content.iter_chunked(8192):
                     file.write(chunk)
-                    total_bytes += len(chunk)
+                    downloaded_bytes += len(chunk)
 
-    return total_bytes
+                    if progress_callback and total_bytes > 0:
+                        progress_callback(downloaded_bytes, total_bytes)
+
+    return downloaded_bytes
 
 def get_best_streams(
     metadata: SodaliteMetadata,
@@ -49,7 +65,6 @@ def get_best_streams(
                 if v.quality == video_quality:
                     video = v
                     break
-
         if not video:
             video = metadata.videos[0]
 
@@ -59,7 +74,6 @@ def get_best_streams(
                 if a.quality == audio_quality:
                     audio = a
                     break
-
         if not audio:
             audio = metadata.audios[0]
 
@@ -71,15 +85,17 @@ async def download_and_merge(
     audio_quality: Optional[str] = None,
     output_format: str = "mp4",
     output_dir: str = None,
-    download_mode: str = "default"
+    download_mode: str = "default",
+    task_id: Optional[str] = None,
+    progress_callback: Optional[Callable[[str], None]] = None
 ) -> str:
     """
     download video and audio streams, merge them with ffmpeg, and inject metadata
     """
     try:
-        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        raise RuntimeError("ffmpeg is not installed or not in PATH. Please install ffmpeg.")
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True, timeout=5)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        raise RuntimeError("ffmpeg is not installed or not in PATH. please install ffmpeg.")
 
     if output_dir is None:
         output_dir = tempfile.gettempdir()
@@ -88,7 +104,6 @@ async def download_and_merge(
         base_name = f"{metadata.service}_{hash(metadata.title)}"
         video_path = os.path.join(temp_dir, f"{base_name}_video.tmp")
         audio_path = os.path.join(temp_dir, f"{base_name}_audio.tmp")
-
         output_path = os.path.join(output_dir, f"{base_name}_final.{output_format}")
 
         video, audio = get_best_streams(metadata, video_quality, audio_quality)
@@ -101,71 +116,63 @@ async def download_and_merge(
         if not video and not audio:
             raise ValueError("no video or audio streams available")
 
+        total_expected_size = 0
+        if video:
+            async with aiohttp.ClientSession() as session:
+                async with session.head(str(video.url), headers=video.headers or {}) as resp:
+                    if 'content-length' in resp.headers:
+                        total_expected_size += int(resp.headers['content-length'])
+        if audio:
+            async with aiohttp.ClientSession() as session:
+                async with session.head(str(audio.url), headers=audio.headers or {}) as resp:
+                    if 'content-length' in resp.headers:
+                        total_expected_size += int(resp.headers['content-length'])
+
+        video_downloaded = 0
+        audio_downloaded = 0
+
+        def update_progress(downloaded, total, is_video):
+            if progress_callback:
+                progress_callback("downloading")
+
         download_tasks = []
         if video:
-            download_tasks.append(download_stream(str(video.url), video_path, video.headers))
+            download_tasks.append(download_stream(str(video.url), video_path, video.headers, lambda d, t: update_progress(d, t, True)))
         if audio:
-            download_tasks.append(download_stream(str(audio.url), audio_path, audio.headers))
+            download_tasks.append(download_stream(str(audio.url), audio_path, audio.headers, lambda d, t: update_progress(d, t, False)))
 
-        results = await asyncio.gather(*download_tasks)
-        total_downloaded_bytes = sum(results) if results else 0
+        await asyncio.gather(*download_tasks)
 
-        if total_downloaded_bytes > 0:
-            from server.main import stats
-            await stats.add_bandwidth(total_downloaded_bytes)
-            print(f"Downloaded {total_downloaded_bytes} bytes for processing")
+        if progress_callback:
+            progress_callback("processing")
 
-        ffmpeg_cmd = ["ffmpeg", "-y"]
-
-        if video and os.path.exists(video_path):
+        ffmpeg_cmd = ["ffmpeg", "-y", "-progress", "pipe:1", "-nostats"]
+        if video:
             ffmpeg_cmd.extend(["-i", video_path])
-        if audio and os.path.exists(audio_path):
+        if audio:
             ffmpeg_cmd.extend(["-i", audio_path])
 
-        if video and audio and os.path.exists(video_path) and os.path.exists(audio_path):
-            ffmpeg_cmd.extend(["-c:v", "copy"])
-
-            audio_codec = audio.codec.lower() if audio.codec else ""
-            if (output_format in ('mp4', 'm4a') and 'aac' in audio_codec) or \
-               (output_format == 'webm' and ('opus' in audio_codec or 'vorbis' in audio_codec)):
-                ffmpeg_cmd.extend(["-c:a", "copy"])
-            elif output_format == 'webm':
+        # codec selection
+        if video:
+            if output_format == "webm":
+                ffmpeg_cmd.extend(["-c:v", "libvpx-vp9"])
+            else:
+                ffmpeg_cmd.extend(["-c:v", "copy"])
+        if audio:
+            if output_format == "webm":
                 ffmpeg_cmd.extend(["-c:a", "libopus"])
             else:
                 ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
-        elif video and os.path.exists(video_path):
-            ffmpeg_cmd.extend(["-c:v", "copy"])
-        elif audio and os.path.exists(audio_path):
-            audio_codec = audio.codec.lower() if audio.codec else ""
 
-            if (output_format in ["m4a", "mp4"] and "aac" in audio_codec) or \
-               (output_format == "opus" and "opus" in audio_codec) or \
-               (output_format == "ogg" and ("opus" in audio_codec or "vorbis" in audio_codec)) or \
-               (output_format == "flac" and "flac" in audio_codec):
-                ffmpeg_cmd.extend(["-c:a", "copy"])
-            elif output_format == "mp3":
-                ffmpeg_cmd.extend(["-c:a", "libmp3lame", "-q:a", "2"])
-            elif output_format == "flac":
-                ffmpeg_cmd.extend(["-c:a", "flac"])
-            elif output_format == "wav":
-                ffmpeg_cmd.extend(["-c:a", "pcm_s16le"])
-            elif output_format == "opus":
-                ffmpeg_cmd.extend(["-c:a", "libopus", "-b:a", "128k"])
-            elif output_format == "ogg":
-                ffmpeg_cmd.extend(["-c:a", "libvorbis", "-q:a", "6"])
-            else:
-                ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
-
-        metadata_args = []
+        # Metadata injection (from original, simplified prompt missed this but it's good to keep)
+        metadata_args = [
+            "-metadata", f"comment=Downloaded with sodalite from {metadata.service}",
+            "-metadata", f"encoder=sodalite"
+        ]
         if metadata.title:
             metadata_args.extend(["-metadata", f"title={metadata.title}"])
         if metadata.author:
             metadata_args.extend(["-metadata", f"artist={metadata.author}"])
-        metadata_args.extend([
-            "-metadata", f"comment=Downloaded with sodalite from {metadata.service}",
-            "-metadata", f"encoder=sodalite"
-        ])
-
         ffmpeg_cmd.extend(metadata_args)
 
         if output_format == "mp4":
@@ -173,64 +180,33 @@ async def download_and_merge(
 
         ffmpeg_cmd.append(output_path)
 
-        def run_ffmpeg():
-            return subprocess.run(
-                ffmpeg_cmd,
-                capture_output=True,
-                text=True
-            )
+        def run_ffmpeg_sync():
+            try:
+                print("starting ffmpeg process...")
+                process = subprocess.run(
+                    ffmpeg_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minutes timeout
+                )
+
+                print(f"ffmpeg finished with return code {process.returncode}")
+                return process.returncode, process.stderr
+
+            except subprocess.TimeoutExpired:
+                print("ffmpeg process timed out")
+                return 1, "Processing timeout"
+            except Exception as e:
+                print(f"ffmpeg execution error: {e}")
+                return 1, f"Execution error: {str(e)}"
 
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            result = await loop.run_in_executor(executor, run_ffmpeg)
+            returncode, stderr = await loop.run_in_executor(executor, run_ffmpeg_sync)
 
-        if result.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed: {result.stderr}")
+        if returncode != 0:
+            raise RuntimeError(f"ffmpeg failed: {stderr}")
 
+        if progress_callback:
+            progress_callback("completed")
         return output_path
-
-async def merge_existing_files(
-    video_path: Optional[str],
-    audio_path: Optional[str],
-    output_path: str,
-    metadata: Optional[SodaliteMetadata] = None
-) -> None:
-    """
-    merge existing video and audio files with metadata injection
-    """
-    if not video_path and not audio_path:
-        raise ValueError("at least one input file required")
-
-    ffmpeg_cmd = ["ffmpeg", "-y"]
-
-    if video_path:
-        ffmpeg_cmd.extend(["-i", video_path])
-    if audio_path:
-        ffmpeg_cmd.extend(["-i", audio_path])
-
-    if video_path and audio_path:
-        ffmpeg_cmd.extend(["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"])
-    else:
-        ffmpeg_cmd.extend(["-c", "copy"])
-
-    if metadata:
-        if metadata.title:
-            ffmpeg_cmd.extend(["-metadata", f"title={metadata.title}"])
-        if metadata.author:
-            ffmpeg_cmd.extend(["-metadata", f"artist={metadata.author}"])
-
-    ffmpeg_cmd.append(output_path)
-
-    def run_ffmpeg():
-        return subprocess.run(
-            ffmpeg_cmd,
-            capture_output=True,
-            text=True
-        )
-
-    loop = asyncio.get_event_loop()
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        result = await loop.run_in_executor(executor, run_ffmpeg)
-
-    if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed: {result.stderr}")

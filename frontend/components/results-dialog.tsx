@@ -19,11 +19,11 @@ import {
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
-import { sodaliteAPI, type DownloadMetadata } from "@/lib/api";
+import { sodaliteAPI, type SanitizedDownloadMetadata } from "@/lib/api";
 import { useDownloads } from "@/context/DownloadContext";
 
 interface ResultsDialogProps {
-  metadata: DownloadMetadata | null;
+  metadata: SanitizedDownloadMetadata | null;
   url: string;
   onOpenChange: () => void;
 }
@@ -66,15 +66,12 @@ export function ResultsDialog({
     }
   }, [metadata]);
 
-  // update format when download mode changes
   useEffect(() => {
     if (downloadMode === "audio_only") {
-      // switch to audio format if current format is video-only
       if (videoFormats.includes(format)) {
         setFormat("mp3");
       }
     } else {
-      // switch to video format if current format is audio-only
       if (audioFormats.includes(format) && !["m4a"].includes(format)) {
         setFormat("mp4");
       }
@@ -129,15 +126,12 @@ export function ResultsDialog({
     }
   };
 
-  // determine which formats to show based on download mode
   const getAvailableFormats = () => {
     if (downloadMode === "audio_only") {
       return audioFormats;
     } else if (downloadMode === "video_only") {
-      // for video-only (muted), we can still use video container formats
       return videoFormats;
     } else {
-      // for default mode (video + audio), show both video containers and m4a
       return [...videoFormats, "m4a"];
     }
   };
@@ -262,45 +256,19 @@ export function ResultsDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              output format
-              {downloadMode === "audio_only" && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  (audio formats)
-                </span>
-              )}
-              {downloadMode === "video_only" && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  (video containers)
-                </span>
-              )}
-            </label>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <label className="text-sm font-medium">format</label>
+            <div className="flex gap-2 flex-wrap">
               {currentFormats.map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => !isProcessing && setFormat(fmt)}
                   disabled={isProcessing}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
-                    format === fmt
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary hover:bg-secondary/80"
-                  }`}
+                  className={`px-4 py-2 sm:px-3 sm:py-1.5 rounded-md text-sm sm:text-xs font-medium transition-all ${format === fmt ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"}`}
                 >
-                  {fmt.toUpperCase()}
+                  {fmt}
                 </button>
               ))}
             </div>
-            {downloadMode === "audio_only" && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {format === "mp3" && "Lossy compression, widely compatible"}
-                {format === "m4a" && "AAC audio, good quality/size ratio"}
-                {format === "opus" && "Modern codec, excellent quality"}
-                {format === "flac" && "Lossless audio, larger files"}
-                {format === "ogg" && "Vorbis codec, open format"}
-                {format === "wav" && "Uncompressed, largest files"}
-              </p>
-            )}
           </div>
 
           <Button
@@ -320,7 +288,7 @@ export function ResultsDialog({
             ) : (
               <>
                 <Download className="mr-2 h-4 w-4" />
-                download {format.toUpperCase()}
+                download
               </>
             )}
           </Button>

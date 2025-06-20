@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DownloadForm } from "@/components/download-form";
 import { ServiceBadges } from "@/components/service-badges";
 import { ResultsDialog } from "@/components/results-dialog";
-import { sodaliteAPI, type DownloadMetadata } from "@/lib/api";
+import { sodaliteAPI, type SanitizedDownloadMetadata } from "@/lib/api";
 import { toast } from "sonner";
 import axios from "axios";
 import { useHealthCheck } from "@/context/HealthCheckContext";
@@ -12,7 +12,9 @@ import { ServerStatus } from "@/components/server-status";
 import { NewsBanner } from "@/components/news-banner";
 
 export default function Home() {
-  const [metadata, setMetadata] = useState<DownloadMetadata | null>(null);
+  const [metadata, setMetadata] = useState<SanitizedDownloadMetadata | null>(
+    null,
+  );
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const { isServerOnline, isConnecting } = useHealthCheck();

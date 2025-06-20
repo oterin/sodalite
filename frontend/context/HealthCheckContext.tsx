@@ -24,8 +24,6 @@ const HealthCheckContext = createContext<HealthCheckContextType | undefined>(
   undefined,
 );
 
-const WS_URL = "wss://backend.otter.llc:1335/sodalite/ws/stats";
-
 export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
   const [isServerOnline, setIsServerOnline] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(true);
@@ -37,7 +35,7 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
     totalConversions,
     totalBandwidthMB,
     isConnected,
-  } = useWebSocket(WS_URL);
+  } = useWebSocket("/sodalite/ws/stats");
 
   useEffect(() => {
     const checkStatus = async () => {

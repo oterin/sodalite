@@ -6,8 +6,7 @@ import os
 import tempfile
 import hashlib
 import json
-from datetime import datetime, timedelta
-from pydantic.json import pydantic_encoder
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +15,6 @@ from pydantic import BaseModel, HttpUrl
 from typing import Optional, Literal, List
 import git
 import asyncio
-import json
 import aiofiles
 import threading
 import time
@@ -35,37 +33,32 @@ from server.services import (
 )
 from server.helper.downloader import download_and_merge
 import aiohttp
-import asyncio
 
 download_semaphore = asyncio.Semaphore(2)
 DOWNLOAD_CLEANUP_DELAY_MINUTES = 5
 
-# sodalite app instance
 app = FastAPI(
     title="sodalite",
     description="a simple downloader for the web - no ads, no tracking, just downloads",
     version="0.1.0"
 )
 
-# cors middleware (because we like, need that lol)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # allowing everything :)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
 
-# request model
-# request/response models
 class DownloadRequest(BaseModel):
     url: HttpUrl
 
 class ProcessRequest(BaseModel):
     url: HttpUrl
-    video_quality: Optional[str] = None  # if None, use best
-    audio_quality: Optional[str] = None  # if None, use best
-    format: Literal["mp4", "webm", "mkv", "mp3", "m4a"] = "mp4"
+    video_quality: Optional[str] = None
+    audio_quality: Optional[str] = None
+    format: Literal["mp4", "webm", "mkv", "mp3", "m4a", "opus", "flac", "ogg", "wav"] = "mp4"
     download_mode: Literal["default", "video_only", "audio_only"] = "default"
 
 class ProcessResponse(BaseModel):
@@ -85,7 +78,6 @@ class ServiceInfo(BaseModel):
 class ServicesResponse(BaseModel):
     services: dict[str, ServiceInfo]
 
-# tempdir for dls
 TEMP_DIR = tempfile.gettempdir()
 DOWNLOAD_DIR = os.path.join(TEMP_DIR, "sodalite_downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -105,7 +97,7 @@ class Statistics:
         self.load_from_file()
 
     def load_from_file(self):
-        """Load stats from file if it exists"""
+        """load stats from file if it exists"""
         try:
             if os.path.exists(STATS_FILE):
                 with open(STATS_FILE, 'r') as f:
@@ -116,7 +108,7 @@ class Statistics:
             print(f"Failed to load stats: {e}")
 
     async def save_to_file(self):
-        """Save stats to file"""
+        """save stats to file"""
         try:
             data = {
                 'total_conversions': self.total_conversions,
@@ -129,17 +121,17 @@ class Statistics:
             print(f"Failed to save stats: {e}")
 
     async def increment_conversion(self):
-        """Increment conversion count and save"""
+        """increment conversion count and save"""
         self.total_conversions += 1
         await self.save_to_file()
 
     async def add_bandwidth(self, bytes_count: int):
-        """Add to bandwidth usage and save"""
+        """add to bandwidth usage and save"""
         self.total_bandwidth_bytes += bytes_count
         await self.save_to_file()
 
     async def add_download_bandwidth(self, url: str, headers: dict = None):
-        """Track bandwidth from downloading a stream"""
+        """track bandwidth from downloading a stream"""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.head(url, headers=headers or {}) as response:
@@ -151,33 +143,28 @@ class Statistics:
 
 stats = Statistics()
 
-# file cleanup tracking
 file_cleanup_tasks = {}
 
 def cleanup_file_after_delay(file_path: str, delay_minutes: int = 10):
-    """Schedule file cleanup after specified delay"""
+    """schedule file cleanup after specified delay"""
     def cleanup():
-        time.sleep(delay_minutes * 60)  # wait for delay
+        time.sleep(delay_minutes * 60)
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
                 print(f"Cleaned up file: {file_path}")
-            # remove from tracking
             if file_path in file_cleanup_tasks:
                 del file_cleanup_tasks[file_path]
         except Exception as e:
             print(f"Error cleaning up file {file_path}: {e}")
 
-    # cancel existing cleanup if file is being re-downloaded
     if file_path in file_cleanup_tasks:
         file_cleanup_tasks[file_path].cancel()
 
-    # start new cleanup thread
     cleanup_thread = threading.Thread(target=cleanup, daemon=True)
     cleanup_thread.start()
     file_cleanup_tasks[file_path] = cleanup_thread
 
-# service mapping (should be extensible 💐)
 SERVICE_HANDLERS = {
     "instagram_reels": instagram_reels.fetch_dl,
     "youtube": youtube.fetch_dl,
@@ -216,7 +203,6 @@ SERVICE_INFO = {
 
 def generate_task_id(url: str) -> str:
     """generates a unique task id for the given url"""
-    # there's NO 🙅🏻‍♂️ way two requests will have the same url and timestamp, right? 😅
     timestamp = datetime.now().isoformat()
     return hashlib.md5(f"{url}{timestamp}".encode()).hexdigest()
 
@@ -225,16 +211,11 @@ async def process_download_task(
     metadata: SodaliteMetadata,
     request: ProcessRequest
 ):
-    """
-    background task to download and merge the video and audio streams
-    because most services LOOOOOOOVE to separate them for some odd fuCKING REASOn
-    """
-    # use a semaphore to limit concurrent downloads and processing
+    """background task to download and merge the video and audio streams"""
     async with download_semaphore:
         try:
             tasks[task_id]["status"] = "processing"
 
-            # download and merge the streams
             output_path = await download_and_merge(
                 metadata=metadata,
                 video_quality=request.video_quality,
@@ -244,24 +225,20 @@ async def process_download_task(
                 download_mode=request.download_mode
             )
 
-            # update task status
             tasks[task_id].update({
                 "status": "completed",
                 "download_url": f"/sodalite/download/{task_id}/file",
                 "file_path": output_path
             })
 
-            # track conversion statistics
             await stats.increment_conversion()
             await broadcast_stats()
 
-            # schedule file cleanup with a shorter delay
             cleanup_file_after_delay(output_path, DOWNLOAD_CLEANUP_DELAY_MINUTES)
 
         except Exception as e:
             tasks[task_id].update({"status": "failed", "error": str(e)})
 
-            # log for debugging rq
             import traceback
             traceback.print_exc()
 
@@ -276,12 +253,9 @@ async def process_download_task(
     }
 )
 async def get_download_info(request: DownloadRequest):
-    """
-    extract download information from a supported service url
-    """
+    """extract download information from a supported service url"""
     url_str = str(request.url)
 
-    # detect service
     service = detect_service(url_str)
 
     if service == "unknown":
@@ -293,7 +267,6 @@ async def get_download_info(request: DownloadRequest):
             }
         )
 
-    # get the handler
     handler = SERVICE_HANDLERS.get(service)
     if not handler:
         raise HTTPException(
@@ -302,7 +275,6 @@ async def get_download_info(request: DownloadRequest):
         )
 
     try:
-        # fetch the metadata
         metadata = await handler(url_str)
         return metadata
 
@@ -330,12 +302,9 @@ async def proces_download(
     request: ProcessRequest,
     background_tasks: BackgroundTasks
 ):
-    """
-    process a download (download video/audio and merge with metadata)
-    """
+    """process a download (download video/audio and merge with metadata)"""
     url_str = str(request.url)
 
-    # first we grab the metadata
     service = detect_service(url_str)
     if service == "unknown":
         raise HTTPException(
@@ -356,10 +325,8 @@ async def proces_download(
     try:
         metadata = await handler(url_str)
 
-        # create task
         task_id = generate_task_id(url_str)
 
-        # Serialize complex objects to JSON strings for local storage
         task_data = {
             "status": "processing",
             "metadata": metadata.model_dump_json(),
@@ -367,12 +334,8 @@ async def proces_download(
             "created_at": datetime.now().isoformat(),
         }
 
-        # Use local dictionary to store the task data
         tasks[task_id] = task_data
-        # Note: In-memory tasks will not persist across server restarts.
-        # No explicit expiration for in-memory tasks as `timedelta` is for KV.
 
-        # start background task to download the task
         background_tasks.add_task(
             process_download_task,
             task_id,
@@ -396,10 +359,7 @@ async def proces_download(
     response_model=ProcessResponse
 )
 async def get_task_status(task_id: str):
-    """
-    get the status of a download task
-    """
-    # Use local dictionary to get the task
+    """get the status of a download task"""
     task = tasks.get(task_id)
     if not task:
         raise HTTPException(
@@ -416,10 +376,7 @@ async def get_task_status(task_id: str):
 
 @app.get("/sodalite/download/{task_id}/file")
 async def download_file(task_id: str):
-    """
-    download the processed file for a task
-    """
-    # Use local dictionary to get the task
+    """download the processed file for a task"""
     task = tasks.get(task_id)
     if not task:
         raise HTTPException(
@@ -440,7 +397,6 @@ async def download_file(task_id: str):
             detail={"error": "file not found"}
         )
 
-    # get original filename for metadata
     metadata_json = task.get("metadata")
     request_json = task.get("request")
 
@@ -450,27 +406,28 @@ async def download_file(task_id: str):
             detail={"error": "Task data incomplete in local store, cannot determine file properties."}
         )
 
-    metadata = SodaliteMetadata.parse_raw(metadata_json)
-    request_obj = ProcessRequest.parse_raw(request_json)
+    metadata = SodaliteMetadata.model_validate_json(metadata_json)
+    request_obj = ProcessRequest.model_validate_json(request_json)
 
     filename = f"{metadata.title[:50]}_{metadata.author[:30]}.{request_obj.format}".replace(" ", "_").replace("/", "_")
-    filename = "".join(c for c in filename if c.isalnum() or c in "._-") # sanitizing the filename (we don't want any funny business)
+    filename = "".join(c for c in filename if c.isalnum() or c in "._-")
 
-    # track bandwidth usage
     file_size = os.path.getsize(file_path)
     await stats.add_bandwidth(file_size)
     await broadcast_stats()
 
-    # extend cleanup time since file is being downloaded
     cleanup_file_after_delay(file_path, 10)
 
-    # return the file response
     media_type_map = {
         "mp4": "video/mp4",
         "webm": "video/webm",
         "mkv": "video/x-matroska",
         "mp3": "audio/mpeg",
-        "m4a": "audio/mp4"
+        "m4a": "audio/mp4",
+        "opus": "audio/opus",
+        "flac": "audio/flac",
+        "ogg": "audio/ogg",
+        "wav": "audio/wav"
     }
 
     file_format = request_obj.format
@@ -487,9 +444,7 @@ async def download_file(task_id: str):
     response_model=ServicesResponse
 )
 async def list_services():
-    """
-    list all supported services
-    """
+    """list all supported services"""
     return ServicesResponse(services=SERVICE_INFO)
 
 async def broadcast_stats():
@@ -509,20 +464,16 @@ async def broadcast_stats():
             except:
                 disconnected.append(websocket)
 
-        # Remove disconnected websockets
         for ws in disconnected:
             if ws in active_websockets:
                 active_websockets.remove(ws)
 
 @app.get("/sodalite/health")
 async def health_check():
-    """
-    health check endpoint
-    """
+    """health check endpoint"""
     global heartbeat_count
     heartbeat_count += 1
 
-    # Broadcast to all connected websockets
     await broadcast_stats()
 
     return {
@@ -540,7 +491,6 @@ async def websocket_stats(websocket: WebSocket):
     active_websockets.append(websocket)
 
     try:
-        # Send current stats immediately
         await websocket.send_text(json.dumps({
             "type": "stats",
             "heartbeats": heartbeat_count,
@@ -549,23 +499,18 @@ async def websocket_stats(websocket: WebSocket):
             "total_bandwidth_mb": round(stats.total_bandwidth_bytes / (1024 * 1024), 2)
         }))
 
-        # Broadcast updated client count to all
         await broadcast_stats()
 
-        # Keep connection alive
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         if websocket in active_websockets:
             active_websockets.remove(websocket)
-        # Broadcast updated client count
         await broadcast_stats()
 
 @app.get("/sodalite/git-info")
 async def git_info():
-    """
-    get git information for the repo
-    """
+    """get git information for the repo"""
     try:
         repo = git.Repo(search_parent_directories=True)
         branch = repo.active_branch.name
@@ -588,20 +533,15 @@ async def git_info():
 
 @app.delete("/sodalite/task/{task_id}")
 async def cleanup_task(task_id: str):
-    """
-    cleanup a task and its associated files
-    """
-    # Use local dictionary to get the task
+    """cleanup a task and its associated files"""
     task = tasks.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail={"error": "task not found"})
 
-    # delete file if exists
     file_path = task.get("file_path")
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
 
-    # remove task from local dictionary
     if task_id in tasks:
         del tasks[task_id]
 

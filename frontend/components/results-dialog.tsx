@@ -44,7 +44,7 @@ export function ResultsDialog({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const videoFormats = ["mp4", "webm", "mkv"];
-  const audioFormats = ["mp3", "m4a"];
+  const audioFormats = ["mp3", "m4a", "opus", "flac", "ogg", "wav"];
 
   useEffect(() => {
     if (metadata) {

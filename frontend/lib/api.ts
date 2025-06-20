@@ -20,11 +20,13 @@ export interface DownloadMetadata {
     width?: number;
     height?: number;
     headers?: Record<string, string>;
+    codec?: string;
   }>;
   audios: Array<{
     url: string;
     quality: string;
     headers?: Record<string, string>;
+    codec?: string;
   }>;
 }
 

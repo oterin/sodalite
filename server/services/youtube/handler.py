@@ -6,13 +6,10 @@ import asyncio
 from typing import List, Optional, Dict, Any
 import re
 import os
-import random
 import time
 import yt_dlp
-import time
 import logging
 
-# import the shared models
 from server.helper.errors import YouTubeError
 from server.models.metadata import Video, Audio, SodaliteMetadata
 
@@ -35,7 +32,6 @@ def create_ytdl_options() -> Dict[str, Any]:
         'socket_timeout': 20,
     }
 
-    # add cookies.txt if it exists in the same directory (netscape format)
     cookies_path = 'server/services/youtube/cookies.txt'
     if os.path.exists(cookies_path):
         print(f"using cookies from {cookies_path} (netscape format)")
@@ -53,14 +49,12 @@ def extract_formats_from_ytdl_info(info: Dict[str, Any]) -> tuple[List[Video], L
 
     for fmt in formats:
         format_url = fmt.get('url')
-        # skip problematic formats
         if not format_url or fmt.get('vcodec') == 'av01':
             continue
 
         vcodec = fmt.get('vcodec', 'none')
         acodec = fmt.get('acodec', 'none')
 
-        # video streams (including muxed)
         if vcodec != 'none':
             height = fmt.get('height')
             width = fmt.get('width')
@@ -69,24 +63,21 @@ def extract_formats_from_ytdl_info(info: Dict[str, Any]) -> tuple[List[Video], L
 
             if not height: continue
 
-            # create a unique key for this quality
             quality_key = f"{height}p"
             if fps and fps > 30:
                 quality_key += f"{int(fps)}"
 
-            # simple quality string
             quality_str = quality_key
 
-            # prioritize mp4 over webm, and non-muxed over muxed for simplicity
             if quality_key not in unique_videos or (ext == 'mp4' and not unique_videos[quality_key].quality.endswith('(video+audio)')):
                 unique_videos[quality_key] = Video(
                     url=format_url,
                     quality=quality_str,
                     width=width,
-                    height=height
+                    height=height,
+                    codec=vcodec
                 )
 
-        # audio-only streams
         elif acodec != 'none' and vcodec == 'none':
             abr = fmt.get('abr')
             ext = fmt.get('ext')
@@ -95,18 +86,16 @@ def extract_formats_from_ytdl_info(info: Dict[str, Any]) -> tuple[List[Video], L
 
             quality_key = f"{int(abr)}kbps"
 
-            # prioritize m4a/mp4a over others
             if quality_key not in unique_audios or (ext == 'm4a'):
                 unique_audios[quality_key] = Audio(
                     url=format_url,
-                    quality=quality_key
+                    quality=quality_key,
+                    codec=acodec
                 )
 
-    # convert dicts to lists
     videos = list(unique_videos.values())
     audios = list(unique_audios.values())
 
-    # sort formats by quality (highest first)
     videos.sort(key=lambda v: (v.height or 0), reverse=True)
 
     def extract_bitrate(quality: str) -> int:
@@ -122,12 +111,10 @@ def extract_metadata_from_ytdl_info(info: Dict[str, Any]) -> tuple[str, str, Opt
     title = info.get('title', 'unknown title')
     uploader = info.get('uploader', info.get('channel', 'unknown author'))
 
-    # get the best thumbnail
     thumbnails = info.get('thumbnails', [])
     thumbnail_url = None
 
     if thumbnails:
-        # sort by resolution and get the best one
         sorted_thumbnails = sorted(
             thumbnails,
             key=lambda t: (t.get('width', 0) * t.get('height', 0), t.get('preference', 0)),
@@ -143,16 +130,12 @@ async def fetch_dl(url: str) -> SodaliteMetadata:
     """
 
     try:
-        # run yt-dlp extraction in executor to avoid blocking
         loop = asyncio.get_event_loop()
         info = await loop.run_in_executor(None, _extract_with_ytdlp_sync, url)
 
-        # extract formats and metadata
         videos, audios = extract_formats_from_ytdl_info(info)
         title, author, thumbnail_url = extract_metadata_from_ytdl_info(info)
 
-        # u0927kg2f97: ensure thumbnail_url is none if not a string or not a valid url
-        # sodalitemetadata expects thumbnail_url as httpurl | none, so pass none if not a string or not a valid url
         from pydantic import HttpUrl, ValidationError
 
         valid_thumbnail_url = None
@@ -178,18 +161,16 @@ def _extract_with_ytdlp_sync(url: str) -> Dict[str, Any]:
     """extract video info using yt-dlp synchronously with retries."""
     ytdl_opts = create_ytdl_options()
     max_retries = 3
-    base_delay = 2  # seconds
+    base_delay = 2
 
     for attempt in range(max_retries):
         try:
             with yt_dlp.YoutubeDL(ytdl_opts) as ydl:
-                # extract info without downloading
                 info = ydl.extract_info(url, download=False)
 
                 if not info:
                     raise YouTubeError("no video information could be extracted")
 
-                # handle playlist case - get first video
                 if 'entries' in info:
                     entries = list(info['entries'])
                     if not entries:
@@ -201,14 +182,12 @@ def _extract_with_ytdlp_sync(url: str) -> Dict[str, Any]:
         except yt_dlp.DownloadError as e:
             error_msg = str(e).lower()
 
-            # check for http 429 and retry with exponential backoff
             if '429' in error_msg and attempt < max_retries - 1:
                 delay = base_delay * (2 ** attempt)
                 print(f"youtube handler: http 429 received. retrying in {delay} seconds...")
                 time.sleep(delay)
                 continue
 
-            # check for other common errors
             if 'private video' in error_msg:
                 raise YouTubeError("video is private")
             elif 'video unavailable' in error_msg or 'not available' in error_msg:
@@ -220,14 +199,11 @@ def _extract_with_ytdlp_sync(url: str) -> Dict[str, Any]:
             elif 'region' in error_msg or 'country' in error_msg:
                 raise YouTubeError("video not available in your region")
             else:
-                # if it's the last attempt on a 429 or any other error, raise it
                 raise YouTubeError(f"download error: {str(e)}")
 
         except Exception as e:
-            # handle non-download errors
             raise YouTubeError(f"unexpected error: {str(e)}")
 
-    # if all retries fail
     raise YouTubeError("extraction failed after multiple retries due to rate limiting.")
 
 

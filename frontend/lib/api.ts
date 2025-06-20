@@ -77,14 +77,12 @@ export const sodaliteAPI = {
     const response = await api.get("/sodalite/git-info");
     return response.data;
   },
-
-  healthCheck: async (): Promise<{ status: string }> => {
-    const response = await api.get("/sodalite/health");
-    return response.data;
+  getDownloadUrl: (taskId: string): string => {
+    return `${API_BASE_URL}/sodalite/download/${taskId}/file`;
   },
 
-  getDownloadUrl: (taskId: string): string => {
-    // Use API_BASE_URL for absolute URL
-    return `${API_BASE_URL}/sodalite/download/${taskId}/file`;
+  healthCheck: async (): Promise<{ status: string; heartbeats: number }> => {
+    const response = await api.get("/sodalite/health");
+    return response.data;
   },
 };

@@ -85,6 +85,9 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 # as this will not persist across server restarts.
 tasks = {}
 
+# Global heartbeat counter
+heartbeat_count = 0
+
 # service mapping (should be extensible 💐)
 SERVICE_HANDLERS = {
     "instagram_reels": instagram_reels.fetch_dl,
@@ -389,19 +392,7 @@ async def health_check():
     """
     health check endpoint
     """
-    # check if ffmpeg is available
-    import subprocess
-    try:
-        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
-        ffmpeg_available = True
-    except:
-        ffmpeg_available = False
-
-    return {
-        "status": "ok",
-        "ffmpeg_available": ffmpeg_available,
-        "temp_dir": DOWNLOAD_DIR
-    }
+    return {"status": "ok"}
 
 @app.get("/sodalite/git-info")
 async def git_info():

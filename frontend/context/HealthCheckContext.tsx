@@ -12,6 +12,7 @@ import { sodaliteAPI } from "@/lib/api";
 interface HealthCheckContextType {
   isServerOnline: boolean;
   lastChecked: Date | null;
+  heartbeats: number | null;
 }
 
 const HealthCheckContext = createContext<HealthCheckContextType | undefined>(
@@ -21,32 +22,33 @@ const HealthCheckContext = createContext<HealthCheckContextType | undefined>(
 export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
   const [isServerOnline, setIsServerOnline] = useState<boolean>(true);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [heartbeats, setHeartbeats] = useState<number | null>(null);
 
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        // This function will be added to the api.ts file later
-        await sodaliteAPI.healthCheck();
+        const data = await sodaliteAPI.healthCheck();
         setIsServerOnline(true);
+        setHeartbeats(data.heartbeats);
       } catch (error) {
-        // We can safely assume a failed request means the server is offline
+        // we can safely assume a failed request means the server is offline
         setIsServerOnline(false);
       } finally {
         setLastChecked(new Date());
       }
     };
 
-    // Check immediately on mount
+    // check immediately on mount
     checkStatus();
 
-    // Then check every 30 seconds
-    const intervalId = setInterval(checkStatus, 30000);
+    // then check every 10 seconds
+    const intervalId = setInterval(checkStatus, 10000);
 
-    // Cleanup on unmount
+    // cleanup on unmount
     return () => clearInterval(intervalId);
   }, []);
 
-  const value = { isServerOnline, lastChecked };
+  const value = { isServerOnline, lastChecked, heartbeats };
 
   return (
     <HealthCheckContext.Provider value={value}>

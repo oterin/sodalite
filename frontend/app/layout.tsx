@@ -3,9 +3,7 @@ import { Inter, Lora } from "next/font/google";
 import { Toaster } from "sonner";
 import { DownloadProvider } from "@/context/DownloadContext";
 import { HealthCheckProvider } from "@/context/HealthCheckContext";
-import { DownloadManager } from "@/components/download-manager";
-import { GitInfo } from "@/components/git-info";
-import { HealthIndicator } from "@/components/health-indicator";
+import { ClientLayout } from "@/components/client-layout";
 import "./globals.css";
 
 const inter = Inter({
@@ -39,25 +37,12 @@ export default function RootLayout({
             <div className="flex min-h-screen flex-col">
               <main className="flex-1 relative z-10">{children}</main>
             </div>
-            <DownloadManager />
-            <Toaster
-              position="bottom-center"
-              theme="dark"
-              richColors
-              expand={false}
-              toastOptions={{
-                className:
-                  "font-serif text-sm border-border/50 bg-card/95 backdrop-blur-sm",
-              }}
-            />
+            <div className="flex min-h-screen flex-col">
+              <main className="flex-1 relative z-10">{children}</main>
+            </div>
+            <ClientLayout />
           </DownloadProvider>
         </HealthCheckProvider>
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-4 px-3 py-1.5 bg-card/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm">
-            <GitInfo />
-            <HealthIndicator />
-          </div>
-        </div>
       </body>
     </html>
   );

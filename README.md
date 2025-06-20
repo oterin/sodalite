@@ -1,43 +1,43 @@
-# sodalite
+# 🌊 sodalite
 
-a friendly media downloader for the web
+a friendly media downloader for the web ✨
 
-## what is it?
+## 💭 what is it?
 
-sodalite is an open-source, no-fuss downloader with real-time stats and a clean interface. paste a link from a supported service, choose your quality and format, receive the file download. that's it.
+sodalite is an open-source, no-fuss downloader with real-time stats and a clean interface. paste a link from a supported service, choose your quality and format, receive the file download. that's it. 🎯
 
-## features
+## ✨ features
 
-### simple & intuitive
+### 🎨 simple & intuitive
 - paste any supported link and get download options instantly
-- clean, mobile-friendly interface with brown cottage theme
+- clean, mobile-friendly interface with cozy brown cottage theme 🏡
 - no accounts, no ads, no tracking - just downloads
 
-### real-time statistics
-- live server status with heartbeat monitoring
+### 📊 real-time statistics
+- live server status with heartbeat monitoring 💓
 - connected clients counter via websockets
 - total downloads and bandwidth tracking
 - persistent stats that survive server restarts
 
-### advanced options
+### ⚙️ advanced options
 - video, audio-only, or muted download modes
 - multiple quality options for both video and audio
 - format selection (mp4, webm, mkv, mp3, m4a)
 - background processing with download queue
 
-### mobile-first design
+### 📱 mobile-first design
 - responsive dialog and interface
 - touch-friendly controls
 - works seamlessly on all devices
 
-## supported services
+## 🌐 supported services
 
-- **tiktok** - videos and audio extraction
-- **youtube** - videos, shorts, and music
-- **instagram reels** - full quality downloads
-- ... more coming soon!
+- **tiktok** → videos and audio extraction
+- **youtube** → videos, shorts, and music
+- **instagram reels** → full quality downloads
+- ... more coming soon! 🚀
 
-## how to use
+## 🚀 how to use
 
 1. copy a link from any supported service
 2. paste it into sodalite
@@ -46,26 +46,33 @@ sodalite is an open-source, no-fuss downloader with real-time stats and a clean 
 
 the download manager shows real-time progress and you can queue multiple downloads.
 
-## api endpoints
+## 🔌 api endpoints
 
-### main endpoints
-BASE_URL: `https://backend.otter.llc:1335/`
-- `POST {BASE_URL}/sodalite/download` - get media metadata
-- `POST {BASE_URL}/sodalite/process` - start download processing
-- `GET {BASE_URL}/sodalite/task/{task_id}` - check task status
-- `GET {BASE_URL}/sodalite/download/{task_id}/file` - download processed file
+> **Base URL**: `https://backend.otter.llc:1335/`
 
-### system endpoints
-- `GET {BASE_URL}/sodalite/health` - server health check
-- `GET {BASE_URL}/sodalite/git-info` - git repository information
-- `GET {BASE_URL}/sodalite/services` - list supported services
-- `WS {BASE_URL}/sodalite/ws/stats` - real-time statistics websocket
+### 📥 main endpoints
 
-## tech stack
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/sodalite/download` | Get media metadata and available formats |
+| `POST` | `/sodalite/process` | Start download processing job |
+| `GET` | `/sodalite/task/{task_id}` | Check task status and progress |
+| `GET` | `/sodalite/download/{task_id}/file` | Download the processed file |
+
+### 🔧 system endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/sodalite/health` | Server health check and status |
+| `GET` | `/sodalite/git-info` | Git repository information |
+| `GET` | `/sodalite/services` | List all supported services |
+| `WS` | `/sodalite/ws/stats` | Real-time statistics websocket |
+
+## 💻 tech stack
 
 ### frontend
 - **next.js 15** with react 19
-- **tailwindcss 4** with a custom cozy theme :)
+- **tailwindcss 4** with a custom cozy theme 🎨
 - **framer-motion** for smooth animations
 - **radix-ui** components
 - **axios** for api communication
@@ -79,13 +86,13 @@ BASE_URL: `https://backend.otter.llc:1335/`
 - **websockets** for live statistics
 - **file-based persistence** for statistics
 
-## disclaimer
+## ⚠️ disclaimer
 
 this project is provided for demonstration and educational purposes only. its use may be subject to legal considerations depending on your location. the author(s) and contributors are not responsible for any outcomes from using, sharing, or modifying this software. users should ensure they follow applicable laws and regulations. proceed at your own discretion.
 
-## installation
+## 📦 installation
 
-### development setup
+### 🛠️ development setup
 
 1. clone the repository
 ```bash
@@ -107,14 +114,14 @@ npm install
 npm run dev
 ```
 
-### production deployment
+### 🚀 production deployment
 
 the project is designed to be deployed on:
-- **backend**: any python hosting service
-- **frontend**: vercel (or similar)
-- **requirements**: ffmpeg installed on server
+- **backend** → any python hosting service
+- **frontend** → vercel (or similar)
+- **requirements** → ffmpeg installed on server
 
-## contributing
+## 🤝 contributing
 
 pull requests welcome! please:
 - check existing issues before opening new ones
@@ -122,14 +129,14 @@ pull requests welcome! please:
 - test your changes thoroughly
 - update documentation as needed
 
-## special thanks
+## 💖 special thanks
 
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - youtube download backend
-- [fastapi](https://fastapi.tiangolo.com/) - modern python api framework
-- [next.js](https://nextjs.org/) - react framework
-- [tailwindcss](https://tailwindcss.com/) - utility-first css
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) → youtube download backend
+- [fastapi](https://fastapi.tiangolo.com/) → modern python api framework
+- [next.js](https://nextjs.org/) → react framework
+- [tailwindcss](https://tailwindcss.com/) → utility-first css
 
-## license
+## 📄 license
 
 MIT License
 

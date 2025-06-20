@@ -4,12 +4,6 @@ import { useState } from "react";
 import { useHealthCheck } from "@/context/HealthCheckContext";
 import { cn } from "@/lib/utils";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   ChevronUp,
   ChevronDown,
   Activity,
@@ -22,150 +16,152 @@ export function HealthIndicator() {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     isServerOnline,
+    isConnecting,
     heartbeats,
     connectedClients,
     totalConversions,
     totalBandwidthMB,
   } = useHealthCheck();
 
-  const formatBandwidth = (mb: number | null) => {
-    if (!mb || mb === 0) return "0 MB";
+  const formatBandwidth = (mb: number) => {
     if (mb < 1024) return `${mb.toFixed(1)} MB`;
     return `${(mb / 1024).toFixed(1)} GB`;
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 select-none">
+    <div className="fixed bottom-4 right-4 z-40 select-none">
       {/* Main Status Button */}
       <div
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => isServerOnline && setIsExpanded(!isExpanded)}
         className={cn(
-          "flex items-center gap-2 px-3 py-2 rounded-full border cursor-pointer transition-all duration-200",
-          "bg-card/95 backdrop-blur-sm border-border/50 shadow-lg hover:shadow-xl",
-          isServerOnline
-            ? "hover:bg-green-50/10 hover:border-green-500/30"
-            : "hover:bg-red-50/10 hover:border-red-500/30",
+          "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200",
+          "bg-card/80 backdrop-blur-sm border-border/30 shadow-sm",
+          isServerOnline &&
+            "cursor-pointer hover:bg-card/90 hover:border-border/50",
+          "w-28 sm:w-32", // Fixed width instead of min-width
         )}
       >
         {/* Status Dot */}
         <div
           className={cn(
-            "h-2.5 w-2.5 rounded-full transition-colors",
-            isServerOnline ? "bg-green-500 animate-pulse-slow" : "bg-red-500",
+            "h-2 w-2 rounded-full transition-colors shrink-0",
+            isConnecting
+              ? "bg-yellow-600/80 animate-pulse"
+              : isServerOnline
+                ? "bg-green-600/80 animate-pulse-slow"
+                : "bg-destructive/80",
           )}
         />
 
         {/* Status Text */}
-        <span className="text-sm font-medium text-foreground">
-          {isServerOnline ? "Online" : "Offline"}
+        <span className="text-sm font-medium text-muted-foreground flex-1">
+          {isServerOnline
+            ? "Online"
+            : isConnecting
+              ? "Connecting..."
+              : "Offline"}
         </span>
 
-        {/* Heartbeat Preview (only when online and collapsed) */}
-        {isServerOnline && !isExpanded && typeof heartbeats === "number" && (
-          <span className="text-xs font-mono text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded">
-            {heartbeats.toLocaleString()}
-          </span>
-        )}
-
         {/* Expand/Collapse Icon */}
-        {isServerOnline && (
-          <div className="text-muted-foreground">
+        {(isServerOnline || isConnecting) && (
+          <div className="text-muted-foreground/60 shrink-0">
             {isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-3.5 w-3.5" />
             ) : (
-              <ChevronUp className="h-4 w-4" />
+              <ChevronUp className="h-3.5 w-3.5" />
             )}
           </div>
         )}
       </div>
 
       {/* Expanded Stats Panel */}
-      {isExpanded && isServerOnline && (
-        <div className="mt-2 p-4 rounded-lg border bg-card/95 backdrop-blur-sm border-border/50 shadow-xl animate-slide-up min-w-48">
+      {isExpanded && (isServerOnline || isConnecting) && (
+        <div className="mt-2 p-4 rounded-lg border bg-card/90 backdrop-blur-sm border-border/30 shadow-lg animate-slide-up w-64 sm:w-72">
           <div className="space-y-3">
-            {/* Heartbeats */}
-            {typeof heartbeats === "number" && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-green-500" />
-                  <span className="text-sm text-muted-foreground">
-                    Heartbeats
-                  </span>
+            {/* Connecting message or stats */}
+            {isConnecting ? (
+              <div className="text-center py-4">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className="h-2 w-2 bg-yellow-600/80 rounded-full animate-pulse" />
+                  <p className="text-sm text-muted-foreground">
+                    Connecting to server...
+                  </p>
                 </div>
-                <span className="text-sm font-mono font-medium">
-                  {heartbeats.toLocaleString()}
-                </span>
               </div>
-            )}
+            ) : (
+              <>
+                {/* Heartbeats */}
+                {typeof heartbeats === "number" && (
+                  <div className="flex items-center justify-between py-1">
+                    <div className="flex items-center gap-3">
+                      <Activity className="h-4 w-4 text-muted-foreground/60" />
+                      <span className="text-sm text-muted-foreground font-medium">
+                        Heartbeats
+                      </span>
+                    </div>
+                    <span className="text-sm font-mono text-foreground/80 font-medium">
+                      {heartbeats.toLocaleString()}
+                    </span>
+                  </div>
+                )}
 
-            {/* Connected Clients */}
-            {typeof connectedClients === "number" && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm text-muted-foreground">Clients</span>
-                </div>
-                <span className="text-sm font-mono font-medium">
-                  {connectedClients}
-                </span>
-              </div>
-            )}
+                {/* Connected Clients */}
+                {typeof connectedClients === "number" && (
+                  <div className="flex items-center justify-between py-1">
+                    <div className="flex items-center gap-3">
+                      <Users className="h-4 w-4 text-muted-foreground/60" />
+                      <span className="text-sm text-muted-foreground font-medium">
+                        Connected Clients
+                      </span>
+                    </div>
+                    <span className="text-sm font-mono text-foreground/80 font-medium">
+                      {connectedClients}
+                    </span>
+                  </div>
+                )}
 
-            {/* Total Conversions */}
-            {typeof totalConversions === "number" && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Download className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm text-muted-foreground">
-                    Downloads
-                  </span>
-                </div>
-                <span className="text-sm font-mono font-medium">
-                  {totalConversions.toLocaleString()}
-                </span>
-              </div>
-            )}
+                {/* Total Conversions */}
+                {typeof totalConversions === "number" && (
+                  <div className="flex items-center justify-between py-1">
+                    <div className="flex items-center gap-3">
+                      <Download className="h-4 w-4 text-muted-foreground/60" />
+                      <span className="text-sm text-muted-foreground font-medium">
+                        Total Downloads
+                      </span>
+                    </div>
+                    <span className="text-sm font-mono text-foreground/80 font-medium">
+                      {totalConversions.toLocaleString()}
+                    </span>
+                  </div>
+                )}
 
-            {/* Total Bandwidth */}
-            {typeof totalBandwidthMB === "number" && totalBandwidthMB > 0 && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <HardDrive className="h-4 w-4 text-orange-500" />
-                  <span className="text-sm text-muted-foreground">
-                    Bandwidth
-                  </span>
-                </div>
-                <span className="text-sm font-mono font-medium">
-                  {formatBandwidth(totalBandwidthMB)}
-                </span>
-              </div>
+                {/* Total Bandwidth */}
+                {typeof totalBandwidthMB === "number" && (
+                  <div className="flex items-center justify-between py-1">
+                    <div className="flex items-center gap-3">
+                      <HardDrive className="h-4 w-4 text-muted-foreground/60" />
+                      <span className="text-sm text-muted-foreground font-medium">
+                        Total Bandwidth
+                      </span>
+                    </div>
+                    <span className="text-sm font-mono text-foreground/80 font-medium">
+                      {totalBandwidthMB > 0
+                        ? formatBandwidth(totalBandwidthMB)
+                        : "0 MB"}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Close hint */}
-          <div className="mt-3 pt-3 border-t border-border/50">
-            <p className="text-xs text-muted-foreground text-center">
-              Click to collapse
+          <div className="mt-4 pt-3 border-t border-border/20">
+            <p className="text-xs text-muted-foreground/60 text-center">
+              Tap to collapse
             </p>
           </div>
         </div>
-      )}
-
-      {/* Offline Tooltip */}
-      {!isServerOnline && (
-        <TooltipProvider delayDuration={0}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="absolute inset-0" />
-            </TooltipTrigger>
-            <TooltipContent
-              side="left"
-              className="font-sans text-xs bg-card/95 backdrop-blur-sm border-border/50"
-            >
-              <p className="text-red-400">Server is offline</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
       )}
     </div>
   );

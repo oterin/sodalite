@@ -12,6 +12,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface HealthCheckContextType {
   isServerOnline: boolean;
+  isConnecting: boolean;
   lastChecked: Date | null;
   heartbeats: number | null;
   connectedClients: number | null;
@@ -23,10 +24,11 @@ const HealthCheckContext = createContext<HealthCheckContextType | undefined>(
   undefined,
 );
 
-const WS_URL = "wss://backend.otter.llc:1335/ws/heartbeat";
+const WS_URL = "wss://backend.otter.llc:1335/sodalite/ws/stats";
 
 export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
   const [isServerOnline, setIsServerOnline] = useState<boolean>(false);
+  const [isConnecting, setIsConnecting] = useState<boolean>(true);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
   // Use WebSocket for live stats updates
@@ -44,10 +46,12 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
         const data = await sodaliteAPI.healthCheck();
         if (data && data.status === "ok") {
           setIsServerOnline(true);
+          setIsConnecting(false);
           setLastChecked(new Date());
         }
       } catch (error) {
         setIsServerOnline(false);
+        setIsConnecting(false);
       }
     };
 
@@ -64,12 +68,14 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (isConnected) {
       setIsServerOnline(true);
+      setIsConnecting(false);
       setLastChecked(new Date());
     }
   }, [isConnected]);
 
   const value = {
     isServerOnline,
+    isConnecting,
     lastChecked,
     heartbeats,
     connectedClients,

@@ -489,9 +489,9 @@ async def health_check():
         "total_bandwidth_mb": round(stats.total_bandwidth_bytes / (1024 * 1024), 2)
     }
 
-@app.websocket("/ws/heartbeat")
-async def websocket_heartbeat(websocket: WebSocket):
-    """websocket endpoint for live heartbeat updates"""
+@app.websocket("/sodalite/ws/stats")
+async def websocket_stats(websocket: WebSocket):
+    """websocket endpoint for live stats updates"""
     await websocket.accept()
     active_websockets.append(websocket)
 

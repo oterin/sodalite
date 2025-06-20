@@ -121,7 +121,7 @@ export function ResultsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleDialogClose()}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden border-border/50 bg-card animate-pop-in">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl p-0 gap-0 overflow-hidden border-border/50 bg-card animate-pop-in mx-4">
         <VisuallyHidden>
           <DialogTitle>download options for {metadata.title}</DialogTitle>
         </VisuallyHidden>
@@ -135,7 +135,7 @@ export function ResultsDialog({
           <X className="h-4 w-4" />
         </button>
 
-        <div className="relative h-40 sm:h-48 overflow-hidden bg-muted">
+        <div className="relative h-32 sm:h-40 md:h-48 overflow-hidden bg-muted">
           {metadata.thumbnail_url ? (
             <>
               <Image
@@ -152,8 +152,8 @@ export function ResultsDialog({
             </div>
           )}
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-serif font-semibold mb-1 line-clamp-2">
+          <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-semibold mb-1 line-clamp-2">
               {metadata.title}
             </h2>
             <p className="text-xs sm:text-sm text-muted-foreground">
@@ -162,35 +162,35 @@ export function ResultsDialog({
           </div>
         </div>
 
-        <div className="p-4 sm:p-6 space-y-4">
+        <div className="p-3 sm:p-4 md:p-6 space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">download type</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 disabled={isProcessing || metadata.videos.length === 0}
                 onClick={() => setDownloadMode("default")}
-                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-md border text-xs transition-all ${downloadMode === "default" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
+                className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${downloadMode === "default" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
               >
                 <Film className="h-4 w-4" /> video
               </button>
               <button
                 disabled={isProcessing || metadata.videos.length === 0}
                 onClick={() => setDownloadMode("video_only")}
-                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-md border text-xs transition-all ${downloadMode === "video_only" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
+                className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${downloadMode === "video_only" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
               >
                 <VolumeX className="h-4 w-4" /> muted
               </button>
               <button
                 disabled={isProcessing || metadata.audios.length === 0}
                 onClick={() => setDownloadMode("audio_only")}
-                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-md border text-xs transition-all ${downloadMode === "audio_only" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
+                className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${downloadMode === "audio_only" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
               >
                 <Music className="h-4 w-4" /> audio
               </button>
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
             <div
               className={`space-y-2 transition-opacity ${downloadMode === "audio_only" ? "opacity-40" : "opacity-100"}`}
             >
@@ -204,7 +204,7 @@ export function ResultsDialog({
                     key={video.quality}
                     onClick={() => setSelectedVideo(video.quality)}
                     disabled={isProcessing || downloadMode === "audio_only"}
-                    className={`px-2 py-2 rounded-md border text-xs text-center transition-all ${selectedVideo === video.quality ? "border-primary bg-primary/10 text-foreground" : "border-border hover:border-muted-foreground"}`}
+                    className={`px-3 py-2.5 sm:px-2 sm:py-2 rounded-md border text-sm sm:text-xs text-center transition-all ${selectedVideo === video.quality ? "border-primary bg-primary/10 text-foreground" : "border-border hover:border-muted-foreground"}`}
                   >
                     {video.quality}
                   </button>
@@ -225,7 +225,7 @@ export function ResultsDialog({
                     key={audio.quality}
                     onClick={() => setSelectedAudio(audio.quality)}
                     disabled={isProcessing || downloadMode === "video_only"}
-                    className={`px-2 py-2 rounded-md border text-xs text-center transition-all ${selectedAudio === audio.quality ? "border-primary bg-primary/10 text-foreground" : "border-border hover:border-muted-foreground"}`}
+                    className={`px-3 py-2.5 sm:px-2 sm:py-2 rounded-md border text-sm sm:text-xs text-center transition-all ${selectedAudio === audio.quality ? "border-primary bg-primary/10 text-foreground" : "border-border hover:border-muted-foreground"}`}
                   >
                     {audio.quality}
                   </button>
@@ -236,13 +236,13 @@ export function ResultsDialog({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">format</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {currentFormats.map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => !isProcessing && setFormat(fmt)}
                   disabled={isProcessing}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${format === fmt ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"}`}
+                  className={`px-4 py-2 sm:px-3 sm:py-1.5 rounded-md text-sm sm:text-xs font-medium transition-all ${format === fmt ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"}`}
                 >
                   {fmt}
                 </button>
@@ -251,7 +251,7 @@ export function ResultsDialog({
           </div>
 
           <Button
-            className="w-full h-11 text-base rounded-lg"
+            className="w-full h-12 sm:h-11 text-base rounded-lg"
             onClick={handleDownload}
             disabled={
               isProcessing ||

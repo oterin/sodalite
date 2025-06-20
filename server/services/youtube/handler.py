@@ -31,6 +31,7 @@ def create_ytdl_options() -> Dict[str, Any]:
     # Add cookies.txt if it exists in the same directory
     cookies_path = 'cookies.txt'
     if os.path.exists(cookies_path):
+        print(f"Using cookies from {cookies_path}")
         options['cookiefile'] = cookies_path
 
     return options

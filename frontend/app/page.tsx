@@ -11,10 +11,11 @@ import { useHealthCheck } from "@/context/HealthCheckContext";
 import { ServerStatus } from "@/components/server-status";
 
 export default function Home() {
-  const { isServerOnline, isConnecting } = useHealthCheck();
   const [metadata, setMetadata] = useState<DownloadMetadata | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const { isServerOnline, isConnecting } = useHealthCheck();
+  const isOffline = !isServerOnline && !isConnecting;
 
   const handleUrlSubmit = async (url: string) => {
     setIsLoading(true);
@@ -46,27 +47,32 @@ export default function Home() {
     setCurrentUrl("");
   };
 
-  if (!isServerOnline && !isConnecting) {
-    return <ServerStatus />;
-  }
-
   return (
     <>
       <div className="container relative mx-auto flex min-h-screen flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-lg space-y-6">
-          <div className="text-center space-y-3 animate-fade-in">
-            <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight">
-              sodalite
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              a friendly media downloader
-            </p>
-          </div>
+          {isOffline ? (
+            <ServerStatus />
+          ) : (
+            <>
+              <div className="text-center space-y-3 animate-fade-in">
+                <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight">
+                  sodalite
+                </h1>
+                <p className="text-lg text-muted-foreground">
+                  a friendly media downloader
+                </p>
+              </div>
 
-          <div className="space-y-6 animate-slide-up">
-            <DownloadForm onSubmit={handleUrlSubmit} isLoading={isLoading} />
-            <ServiceBadges />
-          </div>
+              <div className="space-y-6 animate-slide-up">
+                <DownloadForm
+                  onSubmit={handleUrlSubmit}
+                  isLoading={isLoading}
+                />
+                <ServiceBadges />
+              </div>
+            </>
+          )}
         </div>
       </div>
 

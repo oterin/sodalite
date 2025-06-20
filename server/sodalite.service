@@ -18,14 +18,24 @@ TimeoutStopSec=5
 PrivateTmp=true
 NoNewPrivileges=yes
 
+# Hardening & Resource Limits
+# For disk usage, PrivateTmp creates a private /tmp directory for the service.
+# To limit its size to 15GB, you can use: TemporaryFileSystem=/tmp:size=15G
+# Or ensure your system's /tmp partition is sized appropriately.
+MemoryMax=2G
+TasksMax=512
+LimitNOFILE=65536
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictRealtime=true
+
 # Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=sodalite
-
-# Resource limits
-LimitNOFILE=65536
-MemoryMax=1G
 
 [Install]
 WantedBy=multi-user.target

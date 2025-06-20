@@ -48,19 +48,17 @@ export function GitInfo() {
   const githubUrl = `https://github.com/oterin/sodalite/commit/${gitInfo.commit_sha}`;
 
   return (
-    <div className="fixed top-4 left-4 z-30">
-      <a
-        href={githubUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={gitInfo.commit_message}
-        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 bg-card/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm"
-      >
-        <GitBranch className="h-3.5 w-3.5" />
-        <span>
-          {gitInfo.branch} ({shortSha}) &ndash; {commitTime}
-        </span>
-      </a>
-    </div>
+    <a
+      href={githubUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={gitInfo.commit_message}
+      className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <GitBranch className="h-3.5 w-3.5" />
+      <span>
+        {gitInfo.branch} ({shortSha}) &ndash; {commitTime}
+      </span>
+    </a>
   );
 }

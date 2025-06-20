@@ -47,6 +47,9 @@ export interface ProcessResponse {
   status: "processing" | "completed" | "failed";
   download_url?: string;
   error?: string;
+  file_size_mb?: number;
+  video_quality?: string;
+  audio_quality?: string;
 }
 
 export interface TaskPhase {

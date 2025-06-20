@@ -151,7 +151,7 @@ async def fetch_dl(url: str) -> SodaliteMetadata:
         valid_thumbnail_url = None
         if thumbnail_url:
             try:
-                valid_thumbnail_url = HttpUrl.validate(thumbnail_url)
+                valid_thumbnail_url = HttpUrl(thumbnail_url)
             except (ValidationError, ValueError, TypeError):
                 valid_thumbnail_url = None
 

@@ -18,6 +18,8 @@ import git
 import asyncio
 import json
 import aiofiles
+import threading
+import time
 
 from server.helper.detector import detect_service
 from server.helper.errors import (
@@ -32,6 +34,7 @@ from server.services import (
     tiktok
 )
 from server.helper.downloader import download_and_merge
+import aiohttp
 
 # sodalite app instance
 app = FastAPI(
@@ -137,8 +140,45 @@ class Statistics:
         self.total_bandwidth_bytes += bytes_count
         await self.save_to_file()
 
+    async def add_download_bandwidth(self, url: str, headers: dict = None):
+        """Track bandwidth from downloading a stream"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.head(url, headers=headers or {}) as response:
+                    content_length = response.headers.get('content-length')
+                    if content_length:
+                        await self.add_bandwidth(int(content_length))
+        except Exception as e:
+            print(f"Failed to track download bandwidth: {e}")
+
 # Global statistics instance
 stats = Statistics()
+
+# file cleanup tracking
+file_cleanup_tasks = {}
+
+def cleanup_file_after_delay(file_path: str, delay_minutes: int = 10):
+    """Schedule file cleanup after specified delay"""
+    def cleanup():
+        time.sleep(delay_minutes * 60)  # wait for delay
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Cleaned up file: {file_path}")
+            # remove from tracking
+            if file_path in file_cleanup_tasks:
+                del file_cleanup_tasks[file_path]
+        except Exception as e:
+            print(f"Error cleaning up file {file_path}: {e}")
+
+    # cancel existing cleanup if file is being re-downloaded
+    if file_path in file_cleanup_tasks:
+        file_cleanup_tasks[file_path].cancel()
+
+    # start new cleanup thread
+    cleanup_thread = threading.Thread(target=cleanup, daemon=True)
+    cleanup_thread.start()
+    file_cleanup_tasks[file_path] = cleanup_thread
 
 # service mapping (should be extensible 💐)
 SERVICE_HANDLERS = {
@@ -216,6 +256,9 @@ async def process_download_task(
         # track conversion statistics
         await stats.increment_conversion()
         await broadcast_stats()
+
+        # schedule file cleanup after 10 minutes
+        cleanup_file_after_delay(output_path, 10)
 
     except Exception as e:
         tasks[task_id].update({"status": "failed", "error": str(e)})
@@ -419,6 +462,9 @@ async def download_file(task_id: str):
     file_size = os.path.getsize(file_path)
     await stats.add_bandwidth(file_size)
     await broadcast_stats()
+
+    # extend cleanup time since file is being downloaded
+    cleanup_file_after_delay(file_path, 10)
 
     # return the file response
     media_type_map = {

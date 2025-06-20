@@ -11,15 +11,16 @@ import concurrent.futures
 from typing import Optional, Tuple
 from server.models.metadata import SodaliteMetadata, Video, Audio
 
-async def download_stream(url: str, output_path: str, headers: Optional[dict] = None) -> None:
+async def download_stream(url: str, output_path: str, headers: Optional[dict] = None) -> int:
     """
-    download a stream to a file
+    download a stream to a file and return bytes downloaded
     """
     headers = headers or {}
     headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     })
 
+    total_bytes = 0
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as response:
             response.raise_for_status()
@@ -27,6 +28,9 @@ async def download_stream(url: str, output_path: str, headers: Optional[dict] = 
             with open(output_path, 'wb') as file:
                 async for chunk in response.content.iter_chunked(8192):
                     file.write(chunk)
+                    total_bytes += len(chunk)
+
+    return total_bytes
 
 def get_best_streams(
     metadata: SodaliteMetadata,
@@ -105,14 +109,21 @@ async def download_and_merge(
         if not video and not audio:
             raise ValueError("no video or audio streams available")
 
-        # download streams
-        tasks = []
+        # download streams and track bandwidth
+        download_tasks = []
         if video:
-            tasks.append(download_stream(str(video.url), video_path, video.headers))
+            download_tasks.append(download_stream(str(video.url), video_path, video.headers))
         if audio:
-            tasks.append(download_stream(str(audio.url), audio_path, audio.headers))
+            download_tasks.append(download_stream(str(audio.url), audio_path, audio.headers))
 
-        await asyncio.gather(*tasks)
+        results = await asyncio.gather(*download_tasks)
+        total_downloaded_bytes = sum(results) if results else 0
+
+        # track bandwidth usage
+        if total_downloaded_bytes > 0:
+            from server.main import stats
+            await stats.add_bandwidth(total_downloaded_bytes)
+            print(f"Downloaded {total_downloaded_bytes} bytes for processing")
 
         # prepare ffmpeg command
         ffmpeg_cmd = ["ffmpeg", "-y"]  # -y to overwrite

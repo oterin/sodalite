@@ -11,7 +11,7 @@ import { useHealthCheck } from "@/context/HealthCheckContext";
 import { ServerStatus } from "@/components/server-status";
 
 export default function Home() {
-  const { isServerOnline } = useHealthCheck();
+  const { isServerOnline, isConnecting } = useHealthCheck();
   const [metadata, setMetadata] = useState<DownloadMetadata | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +45,6 @@ export default function Home() {
     setMetadata(null);
     setCurrentUrl("");
   };
-  const { isServerOnline, isConnecting } = useHealthCheck();
 
   if (!isServerOnline && !isConnecting) {
     return <ServerStatus />;

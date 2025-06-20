@@ -2,10 +2,10 @@
 YouTube handler using yt-dlp Python library directly.
 Simple and reliable approach using the yt-dlp library instead of subprocess.
 """
-
 import asyncio
 from typing import List, Optional, Dict, Any
 import re
+import os
 import yt_dlp
 
 # Import the shared models
@@ -14,7 +14,7 @@ from server.models.metadata import Video, Audio, SodaliteMetadata
 
 def create_ytdl_options() -> Dict[str, Any]:
     """Create yt-dlp options for extraction."""
-    return {
+    options = {
         'quiet': True,
         'no_warnings': False,
         'extract_flat': False,
@@ -27,6 +27,13 @@ def create_ytdl_options() -> Dict[str, Any]:
         'writesubtitles': False,
         'writeautomaticsub': False,
     }
+
+    # Add cookies.txt if it exists in the same directory
+    cookies_path = 'cookies.txt'
+    if os.path.exists(cookies_path):
+        options['cookiefile'] = cookies_path
+
+    return options
 
 def extract_formats_from_ytdl_info(info: Dict[str, Any]) -> tuple[List[Video], List[Audio]]:
     """Extract and de-duplicate video and audio formats from yt-dlp info dict."""

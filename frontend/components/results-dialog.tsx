@@ -66,6 +66,21 @@ export function ResultsDialog({
     }
   }, [metadata]);
 
+  // update format when download mode changes
+  useEffect(() => {
+    if (downloadMode === "audio_only") {
+      // switch to audio format if current format is video-only
+      if (videoFormats.includes(format)) {
+        setFormat("mp3");
+      }
+    } else {
+      // switch to video format if current format is audio-only
+      if (audioFormats.includes(format) && !["m4a"].includes(format)) {
+        setFormat("mp4");
+      }
+    }
+  }, [downloadMode, format, videoFormats, audioFormats]);
+
   const handleDialogClose = () => {
     if (isProcessing) return;
     setIsOpen(false);
@@ -114,8 +129,20 @@ export function ResultsDialog({
     }
   };
 
-  const currentFormats =
-    downloadMode === "audio_only" ? audioFormats : videoFormats;
+  // determine which formats to show based on download mode
+  const getAvailableFormats = () => {
+    if (downloadMode === "audio_only") {
+      return audioFormats;
+    } else if (downloadMode === "video_only") {
+      // for video-only (muted), we can still use video container formats
+      return videoFormats;
+    } else {
+      // for default mode (video + audio), show both video containers and m4a
+      return [...videoFormats, "m4a"];
+    }
+  };
+
+  const currentFormats = getAvailableFormats();
 
   if (!metadata) return null;
 
@@ -196,7 +223,7 @@ export function ResultsDialog({
             >
               <label className="flex items-center gap-2 text-sm font-medium">
                 <FileVideo className="h-4 w-4 text-muted-foreground" />
-                video
+                video quality
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {metadata.videos.slice(0, 4).map((video) => (
@@ -217,7 +244,7 @@ export function ResultsDialog({
             >
               <label className="flex items-center gap-2 text-sm font-medium">
                 <FileAudio className="h-4 w-4 text-muted-foreground" />
-                audio
+                audio quality
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {metadata.audios.slice(0, 4).map((audio) => (
@@ -235,19 +262,45 @@ export function ResultsDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">format</label>
-            <div className="flex gap-2 flex-wrap">
+            <label className="text-sm font-medium">
+              output format
+              {downloadMode === "audio_only" && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  (audio formats)
+                </span>
+              )}
+              {downloadMode === "video_only" && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  (video containers)
+                </span>
+              )}
+            </label>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {currentFormats.map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => !isProcessing && setFormat(fmt)}
                   disabled={isProcessing}
-                  className={`px-4 py-2 sm:px-3 sm:py-1.5 rounded-md text-sm sm:text-xs font-medium transition-all ${format === fmt ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"}`}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                    format === fmt
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary hover:bg-secondary/80"
+                  }`}
                 >
-                  {fmt}
+                  {fmt.toUpperCase()}
                 </button>
               ))}
             </div>
+            {downloadMode === "audio_only" && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {format === "mp3" && "Lossy compression, widely compatible"}
+                {format === "m4a" && "AAC audio, good quality/size ratio"}
+                {format === "opus" && "Modern codec, excellent quality"}
+                {format === "flac" && "Lossless audio, larger files"}
+                {format === "ogg" && "Vorbis codec, open format"}
+                {format === "wav" && "Uncompressed, largest files"}
+              </p>
+            )}
           </div>
 
           <Button
@@ -267,7 +320,7 @@ export function ResultsDialog({
             ) : (
               <>
                 <Download className="mr-2 h-4 w-4" />
-                download
+                download {format.toUpperCase()}
               </>
             )}
           </Button>

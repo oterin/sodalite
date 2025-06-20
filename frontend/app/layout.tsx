@@ -3,6 +3,7 @@ import { Inter, Lora } from "next/font/google";
 import { Toaster } from "sonner";
 import { DownloadProvider } from "@/context/DownloadContext";
 import { DownloadManager } from "@/components/download-manager";
+import { GitInfo } from "@/components/git-info";
 import "./globals.css";
 
 const inter = Inter({
@@ -46,6 +47,7 @@ export default function RootLayout({
                 "font-serif text-sm border-border/50 bg-card/95 backdrop-blur-sm",
             }}
           />
+          <GitInfo />
         </DownloadProvider>
       </body>
     </html>

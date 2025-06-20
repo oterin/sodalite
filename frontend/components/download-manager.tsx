@@ -123,11 +123,7 @@ export function DownloadManager() {
   const { tasks, clearAllTasks } = useDownloads();
   const { isServerOnline } = useHealthCheck();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // don't show if server is offline
-  if (!isServerOnline) return null;
 
   // auto-expand when new download starts
   useEffect(() => {
@@ -156,6 +152,9 @@ export function DownloadManager() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isExpanded]);
+
+  // don't show if server is offline
+  if (!isServerOnline) return null;
 
   const activeTasks = tasks.filter((t) => t.status === "processing");
   const completedTasks = tasks.filter((t) => t.status === "completed");

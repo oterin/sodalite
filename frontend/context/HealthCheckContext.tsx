@@ -6,6 +6,7 @@ import {
   useState,
   useEffect,
   ReactNode,
+  useRef,
 } from "react";
 import { sodaliteAPI } from "@/lib/api";
 
@@ -23,6 +24,7 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
   const [isServerOnline, setIsServerOnline] = useState<boolean>(true);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [heartbeats, setHeartbeats] = useState<number | null>(null);
+  const lastSuccessfulCheck = useRef<Date | null>(null);
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -30,20 +32,31 @@ export const HealthCheckProvider = ({ children }: { children: ReactNode }) => {
         const data = await sodaliteAPI.healthCheck();
         setIsServerOnline(true);
         setHeartbeats(data.heartbeats);
-        setLastChecked(new Date());
+
+        // Update both refs to the same timestamp
+        const now = new Date();
+        lastSuccessfulCheck.current = now;
+        setLastChecked(now);
       } catch (error) {
-        // we can safely assume a failed request means the server is offline
+        // Server is offline, but keep the last successful heartbeat time
         setIsServerOnline(false);
+        // Don't update lastChecked - it should show when we last successfully connected
+        // Only update if we've never connected before
+        if (lastSuccessfulCheck.current === null) {
+          setLastChecked(new Date());
+        } else {
+          setLastChecked(lastSuccessfulCheck.current);
+        }
       }
     };
 
-    // check immediately on mount
+    // Check immediately on mount
     checkStatus();
 
-    // then check every 10 seconds
+    // Then check every 10 seconds
     const intervalId = setInterval(checkStatus, 10000);
 
-    // cleanup on unmount
+    // Cleanup on unmount
     return () => clearInterval(intervalId);
   }, []);
 

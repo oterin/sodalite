@@ -50,24 +50,24 @@ export interface ErrorDetail {
 
 export const sodaliteAPI = {
   getDownloadInfo: async (url: string): Promise<DownloadMetadata> => {
-    const response = await api.post("/api/download", { url });
+    const response = await api.post("/sodalite/download", { url });
     return response.data;
   },
 
   processDownload: async (
     request: ProcessRequest,
   ): Promise<ProcessResponse> => {
-    const response = await api.post("/api/process", request);
+    const response = await api.post("/sodalite/process", request);
     return response.data;
   },
 
   getTaskStatus: async (taskId: string): Promise<ProcessResponse> => {
-    const response = await api.get(`/api/task/${taskId}`);
+    const response = await api.get(`/sodalite/task/${taskId}`);
     return response.data;
   },
 
   getDownloadUrl: (taskId: string): string => {
     // Use API_BASE_URL for absolute URL
-    return `${API_BASE_URL}/api/download/${taskId}/file`;
+    return `${API_BASE_URL}/sodalite/download/${taskId}/file`;
   },
 };

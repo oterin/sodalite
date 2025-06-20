@@ -153,7 +153,7 @@ async def process_download_task(
         # update task status
         tasks[task_id].update({
             "status": "completed",
-            "download_url": f"/api/download/{task_id}/file",
+            "download_url": f"/sodalite/download/{task_id}/file",
             "file_path": output_path
         })
 
@@ -165,7 +165,7 @@ async def process_download_task(
         traceback.print_exc()
 
 @app.post(
-    "/api/download",
+    "/sodalite/download",
     response_model=SodaliteMetadata,
     responses={
         400: {
@@ -212,7 +212,7 @@ async def get_download_info(request: DownloadRequest):
         )
 
 @app.post(
-    "/api/process",
+    "/sodalite/process",
     response_model=ProcessResponse,
     responses={
         400: {
@@ -291,7 +291,7 @@ async def proces_download(
         )
 
 @app.get(
-    "/api/task/{task_id}",
+    "/sodalite/task/{task_id}",
     response_model=ProcessResponse
 )
 async def get_task_status(task_id: str):
@@ -313,7 +313,7 @@ async def get_task_status(task_id: str):
         error=task.get("error")
     )
 
-@app.get("/api/download/{task_id}/file")
+@app.get("/sodalite/download/{task_id}/file")
 async def download_file(task_id: str):
     """
     download the processed file for a task
@@ -374,7 +374,7 @@ async def download_file(task_id: str):
     )
 
 @app.get(
-    "/api/services",
+    "/sodalite/services",
     response_model=ServicesResponse
 )
 async def list_services():
@@ -383,7 +383,7 @@ async def list_services():
     """
     return ServicesResponse(services=SERVICE_INFO)
 
-@app.get("/api/health")
+@app.get("/sodalite/health")
 async def health_check():
     """
     health check endpoint
@@ -402,7 +402,7 @@ async def health_check():
         "temp_dir": DOWNLOAD_DIR
     }
 
-@app.delete("/api/task/{task_id}")
+@app.delete("/sodalite/task/{task_id}")
 async def cleanup_task(task_id: str):
     """
     cleanup a task and its associated files

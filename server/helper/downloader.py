@@ -4,49 +4,60 @@ sodalite downloader - handles downloading and merging with ffmpeg
 
 import os
 import asyncio
-import aiohttp
 import tempfile
 import subprocess
-import concurrent.futures
+import unicodedata
+import re
 from typing import Optional, Tuple, Callable
 from server.models.metadata import SodaliteMetadata, Video, Audio
-import time
-import re
 
-async def download_stream(
-    url: str,
-    output_path: str,
-    headers: Optional[dict] = None,
-    progress_callback: Optional[Callable[[int, int], None]] = None
-) -> int:
+
+def sanitize_filename(filename: str) -> str:
+    """
+    sanitizes a filename to be safe for all operating systems.
+    - removes special characters
+    - normalizes unicode
+    - replaces spaces with underscores
+    - limits length to 200 characters
+    """
+    filename = unicodedata.normalize('NFKD', filename).encode(
+        'ascii', 'ignore').decode('ascii')
+    filename = re.sub(r'[^\w\s-]', '', filename).strip()
+    filename = re.sub(r'[-\s]+', '_', filename)
+    return filename[:200]
+
+
+async def download_stream(url: str, output_path: str, headers: Optional[dict] = None) -> int:
     """
     download a stream to a file and return bytes downloaded
     """
+    import aiohttp
+    print(f"DEBUG: Attempting to download stream from: {url[:100]}...")
     headers = headers or {}
     headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     })
+    print(f"DEBUG: Using headers: {list(headers.keys())}")
 
-    total_bytes = 0
     downloaded_bytes = 0
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as response:
-            response.raise_for_status()
-
-            content_length = response.headers.get('Content-Length')
-            if content_length:
-                total_bytes = int(content_length)
-
-            with open(output_path, 'wb') as file:
-                async for chunk in response.content.iter_chunked(8192):
-                    file.write(chunk)
-                    downloaded_bytes += len(chunk)
-
-                    if progress_callback and total_bytes > 0:
-                        progress_callback(downloaded_bytes, total_bytes)
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=60) as response:
+                print(
+                    f"DEBUG: Received HTTP status: {response.status} for URL: {url[:100]}...")
+                response.raise_for_status()
+                with open(output_path, 'wb') as file:
+                    async for chunk in response.content.iter_chunked(8192):
+                        file.write(chunk)
+                        downloaded_bytes += len(chunk)
+        print(
+            f"DEBUG: Successfully downloaded {downloaded_bytes} bytes to {os.path.basename(output_path)}")
+    except Exception as e:
+        print(f"ERROR: Failed to download stream {url[:100]}...: {e}")
+        return 0
 
     return downloaded_bytes
+
 
 def get_best_streams(
     metadata: SodaliteMetadata,
@@ -79,6 +90,7 @@ def get_best_streams(
 
     return video, audio
 
+
 async def download_and_merge(
     metadata: SodaliteMetadata,
     video_quality: Optional[str] = None,
@@ -88,71 +100,83 @@ async def download_and_merge(
     download_mode: str = "default",
     task_id: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None
-) -> str:
+) -> tuple[str, int]:
     """
     download video and audio streams, merge them with ffmpeg, and inject metadata
     """
     try:
-        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True, timeout=5)
+        subprocess.run(["ffmpeg", "-version"],
+                       capture_output=True, check=True, timeout=5)
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        raise RuntimeError("ffmpeg is not installed or not in PATH. please install ffmpeg.")
+        raise RuntimeError(
+            "ffmpeg is not installed or not in PATH. please install ffmpeg.")
 
     if output_dir is None:
         output_dir = tempfile.gettempdir()
 
-    with tempfile.TemporaryDirectory(prefix="sodalite_") as temp_dir:
-        base_name = f"{metadata.service}_{hash(metadata.title)}"
-        video_path = os.path.join(temp_dir, f"{base_name}_video.tmp")
-        audio_path = os.path.join(temp_dir, f"{base_name}_audio.tmp")
-        output_path = os.path.join(output_dir, f"{base_name}_final.{output_format}")
+    total_downloaded_bytes = 0
 
-        video, audio = get_best_streams(metadata, video_quality, audio_quality)
+    with tempfile.TemporaryDirectory(prefix="sodalite_") as temp_dir:
+        base_filename = sanitize_filename(
+            f"{metadata.title}_{metadata.author}")
+        output_filename = f"{base_filename}.{output_format}"
+        output_path = os.path.join(output_dir, output_filename)
+
+        video_path = os.path.join(
+            temp_dir, f"{hash(metadata.title)}_video.tmp")
+        audio_path = os.path.join(
+            temp_dir, f"{hash(metadata.title)}_audio.tmp")
+
+        video, audio = get_best_streams(
+            metadata, video_quality, audio_quality)
 
         if download_mode == "video_only":
             audio = None
+            print("DEBUG: Download mode is 'video_only'. Ignoring audio stream.")
         elif download_mode == "audio_only":
             video = None
+            print("DEBUG: Download mode is 'audio_only'. Ignoring video stream.")
 
         if not video and not audio:
             raise ValueError("no video or audio streams available")
 
-        total_expected_size = 0
-        if video:
-            async with aiohttp.ClientSession() as session:
-                async with session.head(str(video.url), headers=video.headers or {}) as resp:
-                    if 'content-length' in resp.headers:
-                        total_expected_size += int(resp.headers['content-length'])
-        if audio:
-            async with aiohttp.ClientSession() as session:
-                async with session.head(str(audio.url), headers=audio.headers or {}) as resp:
-                    if 'content-length' in resp.headers:
-                        total_expected_size += int(resp.headers['content-length'])
+        print(
+            f"DEBUG: Selected video stream: {video.quality if video else 'None'}")
+        print(
+            f"DEBUG: Selected audio stream: {audio.quality if audio else 'None'}")
 
-        video_downloaded = 0
-        audio_downloaded = 0
-
-        def update_progress(downloaded, total, is_video):
-            if progress_callback:
-                progress_callback("downloading")
+        if progress_callback:
+            progress_callback("downloading")
 
         download_tasks = []
-        if video:
-            download_tasks.append(download_stream(str(video.url), video_path, video.headers, lambda d, t: update_progress(d, t, True)))
-        if audio:
-            download_tasks.append(download_stream(str(audio.url), audio_path, audio.headers, lambda d, t: update_progress(d, t, False)))
+        if video and video.url:
+            print(
+                f"DEBUG: Adding video download task for quality '{video.quality}'.")
+            download_tasks.append(download_stream(
+                str(video.url), video_path, video.headers))
+        if audio and audio.url:
+            print(
+                f"DEBUG: Adding audio download task for quality '{audio.quality}'.")
+            download_tasks.append(download_stream(
+                str(audio.url), audio_path, audio.headers))
 
-        await asyncio.gather(*download_tasks)
+        if download_tasks:
+            results = await asyncio.gather(*download_tasks)
+            total_downloaded_bytes = sum(results)
+            print(
+                f"DEBUG: Download tasks finished. Total bytes downloaded: {total_downloaded_bytes}")
+            if any(r == 0 for r in results):
+                raise RuntimeError("one or more streams failed to download")
 
         if progress_callback:
             progress_callback("processing")
 
-        ffmpeg_cmd = ["ffmpeg", "-y", "-progress", "pipe:1", "-nostats"]
+        ffmpeg_cmd = ["ffmpeg", "-y"]
         if video:
             ffmpeg_cmd.extend(["-i", video_path])
         if audio:
             ffmpeg_cmd.extend(["-i", audio_path])
 
-        # codec selection
         if video:
             if output_format == "webm":
                 ffmpeg_cmd.extend(["-c:v", "libvpx-vp9"])
@@ -166,7 +190,6 @@ async def download_and_merge(
             else:
                 ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
 
-        # Metadata injection (from original, simplified prompt missed this but it's good to keep)
         metadata_args = [
             "-metadata", f"comment=Downloaded with sodalite from {metadata.service}",
             "-metadata", f"encoder=sodalite"
@@ -182,33 +205,35 @@ async def download_and_merge(
 
         ffmpeg_cmd.append(output_path)
 
+        print(f"DEBUG: Executing FFmpeg command: {' '.join(ffmpeg_cmd)}")
+
         def run_ffmpeg_sync():
             try:
-                print("starting ffmpeg process...")
                 process = subprocess.run(
                     ffmpeg_cmd,
                     capture_output=True,
                     text=True,
-                    timeout=300  # 5 minutes timeout
+                    timeout=300
                 )
-
-                print(f"ffmpeg finished with return code {process.returncode}")
+                print(
+                    f"DEBUG: FFmpeg process finished with return code {process.returncode}.")
+                if process.returncode != 0:
+                    print(f"ERROR: FFmpeg stderr:\n{process.stderr}")
                 return process.returncode, process.stderr
-
             except subprocess.TimeoutExpired:
-                print("ffmpeg process timed out")
+                print("ERROR: FFmpeg process timed out after 5 minutes.")
                 return 1, "Processing timeout"
             except Exception as e:
-                print(f"ffmpeg execution error: {e}")
+                print(
+                    f"ERROR: An unexpected error occurred during FFmpeg execution: {e}")
                 return 1, f"Execution error: {str(e)}"
 
         loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            returncode, stderr = await loop.run_in_executor(executor, run_ffmpeg_sync)
+        returncode, stderr = await loop.run_in_executor(None, run_ffmpeg_sync)
 
         if returncode != 0:
             raise RuntimeError(f"ffmpeg failed: {stderr}")
 
         if progress_callback:
             progress_callback("completed")
-        return output_path
+        return output_path, total_downloaded_bytes

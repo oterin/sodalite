@@ -25,7 +25,7 @@ import io
 
 from server.helper.detector import detect_service
 from server.helper.errors import (
-    InstagramReelsError,
+    InstagramError,
     YouTubeError,
     TikTokError
 )
@@ -302,7 +302,7 @@ SERVICE_HANDLERS = {
 }
 
 SERVICE_ERRORS = {
-    "instagram": InstagramReelsError,
+    "instagram": InstagramError,
     "youtube": YouTubeError,
     "tiktok": TikTokError
 }

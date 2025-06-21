@@ -187,7 +187,8 @@ async def broadcast_stats():
             except Exception:
                 disconnected_websockets.append(websocket)
         for websocket in disconnected_websockets:
-            active_websockets.remove(websocket)
+            if websocket in active_websockets:
+                active_websockets.remove(websocket)
 
 
 async def periodic_stats_broadcast():

@@ -165,8 +165,8 @@ async def download_and_merge(
             total_downloaded_bytes = sum(results)
             print(
                 f"DEBUG: Download tasks finished. Total bytes downloaded: {total_downloaded_bytes}")
-            if any(r == 0 for r in results):
-                raise RuntimeError("one or more streams failed to download")
+            if all(r == 0 for r in results):
+                raise RuntimeError("all streams failed to download")
 
         if progress_callback:
             progress_callback("processing")

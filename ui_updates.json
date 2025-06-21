@@ -5,7 +5,7 @@
     {
       "id": "audio-integration-issue-210625",
       "type": "update",
-      "severity": "low",
+      "severity": "medium",
       "title": "Some audio codecs broken",
       "message": "The following audio codes are broken due to an ffmpeg misconfiguration: OGG, OPUS, FLAC. A fix will be pushed @ 20:00 UTC (June 21st)",
       "timestamp": "2025-06-20T17:07:07.502432Z",

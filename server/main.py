@@ -34,6 +34,7 @@ from server.services import (
     tiktok
 )
 from server.helper.downloader import download_and_merge
+import aiohttp
 
 download_semaphore = asyncio.Semaphore(2)
 DOWNLOAD_CLEANUP_DELAY_MINUTES = 5

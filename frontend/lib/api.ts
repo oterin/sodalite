@@ -101,6 +101,10 @@ export const sodaliteAPI = {
     return `${API_BASE_URL}/sodalite/download/${taskId}/file`;
   },
 
+  getApiBaseUrl: (): string => {
+    return API_BASE_URL;
+  },
+
   healthCheck: async (): Promise<{ status: string; heartbeats: number }> => {
     const response = await api.get("/sodalite/health");
     return response.data;

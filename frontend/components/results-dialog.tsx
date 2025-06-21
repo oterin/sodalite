@@ -27,6 +27,7 @@ interface ResultsDialogProps {
   metadata: SanitizedDownloadMetadata | null;
   url: string;
   onOpenChange: () => void;
+  thumbnailUrl?: string;
 }
 
 type DownloadMode = "default" | "video_only" | "audio_only";
@@ -35,6 +36,7 @@ export function ResultsDialog({
   metadata,
   url,
   onOpenChange,
+  thumbnailUrl,
 }: ResultsDialogProps) {
   const { addTask } = useDownloads();
   const [isOpen, setIsOpen] = useState(false);
@@ -94,9 +96,11 @@ export function ResultsDialog({
     setIsProcessing(true);
 
     try {
-      // for photo posts, we can just download the thumbnail directly
-      if (isPhotoPost && metadata.videos[0]) {
-        window.open(metadata.videos[0].url, "_blank");
+      if (isPhotoPost && thumbnailUrl) {
+        const photoUrl = `${sodaliteAPI.getApiBaseUrl()}/sodalite/download/photo?url=${encodeURIComponent(
+          thumbnailUrl,
+        )}`;
+        window.open(photoUrl, "_blank");
         toast.success("downloading photo!");
         handleDialogClose();
         return;
@@ -314,7 +318,11 @@ export function ResultsDialog({
                   key={fmt}
                   onClick={() => !isProcessing && setFormat(fmt)}
                   disabled={isProcessing}
-                  className={`px-4 py-2 sm:px-3 sm:py-1.5 rounded-md text-sm sm:text-xs font-medium transition-all ${format === fmt ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"}`}
+                  className={`px-4 py-2 sm:px-3 sm:py-1.5 rounded-md text-sm sm:text-xs font-medium transition-all ${
+                    format === fmt
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary hover:bg-secondary/80"
+                  }`}
                 >
                   {fmt}
                 </button>

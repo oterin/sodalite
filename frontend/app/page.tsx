@@ -88,6 +88,7 @@ export default function Home() {
         metadata={metadata}
         url={currentUrl}
         onOpenChange={handleReset}
+        thumbnailUrl={metadata?.thumbnail_url}
       />
     </>
   );

@@ -671,6 +671,28 @@ async def websocket_stats(websocket: WebSocket):
             stats_broadcast_task.cancel()
 
 
+@app.get("/sodalite/download/photo")
+async def download_photo(url: str):
+    """download a photo directly from a url"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                content = await response.read()
+                # create a temporary file to serve
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+                    tmp.write(content)
+                    tmp_path = tmp.name
+
+                return FileResponse(
+                    tmp_path,
+                    media_type="image/jpeg",
+                    filename="photo.jpg"
+                )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/sodalite/git-info")
 async def git_info():
     try:

@@ -603,6 +603,11 @@ async def download_file(task_id: str):
 
     filename = os.path.basename(file_path)
 
+    # track outbound bandwidth
+    file_size = os.path.getsize(file_path)
+    await stats.add_bandwidth(file_size)
+    await broadcast_stats()
+
     return FileResponse(
         file_path,
         filename=filename,

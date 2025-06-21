@@ -3,13 +3,13 @@
   "last_updated": "2025-06-20T14:07:07.502553Z",
   "news": [
     {
-      "id": "update-2025-06-20-resolved",
+      "id": "youtube-integration-fix-210625",
       "type": "update",
       "severity": "low",
-      "title": "Backend Service Restored",
-      "message": "The backend service disruption has been resolved. All services are now operating normally. Thank you for your patience during this outage.",
-      "timestamp": "2025-06-20T14:07:07.502432Z",
-      "expires": "2025-06-21T14:07:07.502432Z",
+      "title": "YouTube Integration Fixed",
+      "message": "The issue with the YouTube integration has been resolved. All related features are now operating normally.",
+      "timestamp": "2025-06-20T17:07:07.502432Z",
+      "expires": "2025-06-21T17:07:07.502432Z",
       "show_when_offline": false,
       "icon": "check-circle",
       "color": "success"

@@ -15,7 +15,7 @@ def detect_service(url: str) -> str:
 
     # instagram division
     if (
-        "instagram.com/reels" in url
+        "instagram.com/reel" in url
         or "instagram.com/p" in url
     ):
         return "instagram"

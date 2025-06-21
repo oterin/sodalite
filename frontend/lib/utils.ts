@@ -6,11 +6,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function detectService(url: string): string {
-  if (
-    url.includes("instagram.com/reel") ||
-    url.includes("instagram.com/reels")
-  ) {
-    return "Instagram Reels";
+  if (url.includes("instagram.com")) {
+    return "Instagram";
   }
   if (url.includes("youtube.com") || url.includes("youtu.be")) {
     return "YouTube";

@@ -14,6 +14,7 @@ import {
   Film,
   Music,
   VolumeX,
+  Image as ImageIcon,
 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -42,6 +43,8 @@ export function ResultsDialog({
   const [downloadMode, setDownloadMode] = useState<DownloadMode>("default");
   const [format, setFormat] = useState<string>("mp4");
   const [isProcessing, setIsProcessing] = useState(false);
+  const isPhotoPost =
+    metadata?.videos.some((v) => v.quality === "photo") ?? false;
 
   const videoFormats = ["mp4", "webm", "mkv"];
   const audioFormats = ["mp3", "m4a", "opus", "flac", "ogg", "wav"];
@@ -58,13 +61,15 @@ export function ResultsDialog({
 
       if (newMode === "audio_only") {
         setFormat("mp3");
+      } else if (isPhotoPost) {
+        setFormat("jpeg");
       } else {
         setFormat("mp4");
       }
     } else {
       setIsOpen(false);
     }
-  }, [metadata]);
+  }, [metadata, isPhotoPost]);
 
   useEffect(() => {
     if (downloadMode === "audio_only") {
@@ -89,6 +94,14 @@ export function ResultsDialog({
     setIsProcessing(true);
 
     try {
+      // for photo posts, we can just download the thumbnail directly
+      if (isPhotoPost && metadata.videos[0]) {
+        window.open(metadata.videos[0].url, "_blank");
+        toast.success("downloading photo!");
+        handleDialogClose();
+        return;
+      }
+
       const response = await sodaliteAPI.processDownload({
         url: url,
         video_quality:
@@ -127,6 +140,9 @@ export function ResultsDialog({
   };
 
   const getAvailableFormats = () => {
+    if (isPhotoPost) {
+      return ["jpeg", "png"];
+    }
     if (downloadMode === "audio_only") {
       return audioFormats;
     } else if (downloadMode === "video_only") {
@@ -184,76 +200,111 @@ export function ResultsDialog({
         </div>
 
         <div className="p-3 sm:p-4 md:p-6 space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">download type</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button
-                disabled={isProcessing || metadata.videos.length === 0}
-                onClick={() => setDownloadMode("default")}
-                className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${downloadMode === "default" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
-              >
-                <Film className="h-4 w-4" /> video
-              </button>
-              <button
-                disabled={isProcessing || metadata.videos.length === 0}
-                onClick={() => setDownloadMode("video_only")}
-                className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${downloadMode === "video_only" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
-              >
-                <VolumeX className="h-4 w-4" /> muted
-              </button>
-              <button
-                disabled={isProcessing || metadata.audios.length === 0}
-                onClick={() => setDownloadMode("audio_only")}
-                className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${downloadMode === "audio_only" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
-              >
-                <Music className="h-4 w-4" /> audio
-              </button>
+          {isPhotoPost ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">download photo</label>
+              <p className="text-xs text-muted-foreground">
+                this is a photo post. you can download the image directly.
+              </p>
             </div>
-          </div>
-
-          <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
-            <div
-              className={`space-y-2 transition-opacity ${downloadMode === "audio_only" ? "opacity-40" : "opacity-100"}`}
-            >
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <FileVideo className="h-4 w-4 text-muted-foreground" />
-                video quality
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {metadata.videos.slice(0, 4).map((video) => (
-                  <button
-                    key={video.quality}
-                    onClick={() => setSelectedVideo(video.quality)}
-                    disabled={isProcessing || downloadMode === "audio_only"}
-                    className={`px-3 py-2.5 sm:px-2 sm:py-2 rounded-md border text-sm sm:text-xs text-center transition-all ${selectedVideo === video.quality ? "border-primary bg-primary/10 text-foreground" : "border-border hover:border-muted-foreground"}`}
-                  >
-                    {video.quality}
-                  </button>
-                ))}
+          ) : (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">download type</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  disabled={isProcessing || metadata.videos.length === 0}
+                  onClick={() => setDownloadMode("default")}
+                  className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${
+                    downloadMode === "default"
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                >
+                  <Film className="h-4 w-4" /> video
+                </button>
+                <button
+                  disabled={isProcessing || metadata.videos.length === 0}
+                  onClick={() => setDownloadMode("video_only")}
+                  className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${
+                    downloadMode === "video_only"
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                >
+                  <VolumeX className="h-4 w-4" /> muted
+                </button>
+                <button
+                  disabled={isProcessing || metadata.audios.length === 0}
+                  onClick={() => setDownloadMode("audio_only")}
+                  className={`flex items-center justify-center gap-2 sm:flex-col sm:gap-1 p-3 sm:p-2 rounded-md border text-sm sm:text-xs transition-all ${
+                    downloadMode === "audio_only"
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                >
+                  <Music className="h-4 w-4" /> audio
+                </button>
               </div>
             </div>
+          )}
 
-            <div
-              className={`space-y-2 transition-opacity ${downloadMode === "video_only" ? "opacity-40" : "opacity-100"}`}
-            >
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <FileAudio className="h-4 w-4 text-muted-foreground" />
-                audio quality
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {metadata.audios.slice(0, 4).map((audio) => (
-                  <button
-                    key={audio.quality}
-                    onClick={() => setSelectedAudio(audio.quality)}
-                    disabled={isProcessing || downloadMode === "video_only"}
-                    className={`px-3 py-2.5 sm:px-2 sm:py-2 rounded-md border text-sm sm:text-xs text-center transition-all ${selectedAudio === audio.quality ? "border-primary bg-primary/10 text-foreground" : "border-border hover:border-muted-foreground"}`}
-                  >
-                    {audio.quality}
-                  </button>
-                ))}
+          {!isPhotoPost && (
+            <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
+              <div
+                className={`space-y-2 transition-opacity ${
+                  downloadMode === "audio_only" ? "opacity-40" : "opacity-100"
+                }`}
+              >
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <FileVideo className="h-4 w-4 text-muted-foreground" />
+                  video quality
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {metadata.videos.slice(0, 4).map((video) => (
+                    <button
+                      key={video.quality}
+                      onClick={() => setSelectedVideo(video.quality)}
+                      disabled={isProcessing || downloadMode === "audio_only"}
+                      className={`px-3 py-2.5 sm:px-2 sm:py-2 rounded-md border text-sm sm:text-xs text-center transition-all ${
+                        selectedVideo === video.quality
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border hover:border-muted-foreground"
+                      }`}
+                    >
+                      {video.quality}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                className={`space-y-2 transition-opacity ${
+                  downloadMode === "video_only" ? "opacity-40" : "opacity-100"
+                }`}
+              >
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <FileAudio className="h-4 w-4 text-muted-foreground" />
+                  audio quality
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {metadata.audios.slice(0, 4).map((audio) => (
+                    <button
+                      key={audio.quality}
+                      onClick={() => setSelectedAudio(audio.quality)}
+                      disabled={isProcessing || downloadMode === "video_only"}
+                      className={`px-3 py-2.5 sm:px-2 sm:py-2 rounded-md border text-sm sm:text-xs text-center transition-all ${
+                        selectedAudio === audio.quality
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border hover:border-muted-foreground"
+                      }`}
+                    >
+                      {audio.quality}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-sm font-medium">format</label>
@@ -276,14 +327,20 @@ export function ResultsDialog({
             onClick={handleDownload}
             disabled={
               isProcessing ||
-              (downloadMode !== "audio_only" && !selectedVideo) ||
-              (downloadMode !== "video_only" && !selectedAudio)
+              (!isPhotoPost &&
+                ((downloadMode !== "audio_only" && !selectedVideo) ||
+                  (downloadMode !== "video_only" && !selectedAudio)))
             }
           >
             {isProcessing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 processing...
+              </>
+            ) : isPhotoPost ? (
+              <>
+                <ImageIcon className="mr-2 h-4 w-4" />
+                download photo
               </>
             ) : (
               <>

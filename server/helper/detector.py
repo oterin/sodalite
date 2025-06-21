@@ -13,12 +13,12 @@ def detect_service(url: str) -> str:
         str: The name of the service if detected, otherwise 'unknown'.
     """
 
-    # instagram reels division
+    # instagram division
     if (
-        "instagram.com/reel" in url
+        "instagram.com/reels" in url
         or "instagram.com/p" in url
     ):
-        return "instagram_reels"
+        return "instagram"
 
     # youtube division
     if (

@@ -23,13 +23,13 @@ from contextlib import asynccontextmanager
 
 from server.helper.detector import detect_service
 from server.helper.errors import (
-    InstagramReelsError,
+    InstagramError,
     YouTubeError,
     TikTokError
 )
 from server.models.metadata import SodaliteMetadata, SanitizedSodaliteMetadata
 from server.services import (
-    instagram_reels,
+    instagram,
     youtube,
     tiktok
 )
@@ -293,23 +293,23 @@ def cleanup_file_after_delay(file_path: str, delay_minutes: int = 10):
 
 
 SERVICE_HANDLERS = {
-    "instagram_reels": instagram_reels.fetch_dl,
+    "instagram": instagram.fetch_dl,
     "youtube": youtube.fetch_dl,
     "tiktok": tiktok.fetch_dl
 }
 
 SERVICE_ERRORS = {
-    "instagram_reels": InstagramReelsError,
+    "instagram": InstagramError,
     "youtube": YouTubeError,
     "tiktok": TikTokError
 }
 
 SERVICE_INFO = {
-    "instagram_reels": ServiceInfo(
-        name="Instagram Reels",
+    "instagram": ServiceInfo(
+        name="Instagram",
         example_urls=[
-            "https://www.instagram.com/reel/ABC123",
-            "https://www.instagram.com/reels/XYZ789"
+            "https://www.instagram.com/p/C123456789/",
+            "https://www.instagram.com/reel/ABC123"
         ]
     ),
     "youtube": ServiceInfo(

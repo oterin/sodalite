@@ -1,5 +1,5 @@
 """
-sodalite instagram reels service
+sodalite instagram service
 """
 
 from .handler import fetch_dl

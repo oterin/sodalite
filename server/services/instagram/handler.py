@@ -1,8 +1,8 @@
 """
-sodalite service for instagram reels
+sodalite service for instagram
 """
 
-from server.helper.errors import InstagramReelsError
+from server.helper.errors import InstagramError
 from server.models.metadata import SodaliteMetadata, Video, Audio
 from typing import Dict, Optional
 import aiohttp
@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 import asyncio
 
 async def _get_raw_data(url: str, retry_count: int = 3) -> str:
-    """fetches the raw html from the instagram reels url with retry logic"""
+    """fetches the raw html from the instagram url with retry logic"""
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'accept-encoding': 'gzip, deflate, br',
@@ -45,15 +45,15 @@ async def _get_raw_data(url: str, retry_count: int = 3) -> str:
                         if attempt < retry_count - 1:
                             await asyncio.sleep(1)  # Wait 1 second before retry
                             continue
-                        raise InstagramReelsError(f"failed to fetch data from {url}")
+                        raise InstagramError(f"failed to fetch data from {url}")
                     return await response.text(encoding='utf-8', errors='ignore')
         except Exception as e:
             if attempt < retry_count - 1:
                 await asyncio.sleep(1)  # Wait 1 second before retry
                 continue
-            raise InstagramReelsError(f"failed to fetch data from {url}: {str(e)}")
+            raise InstagramError(f"failed to fetch data from {url}: {str(e)}")
 
-    raise InstagramReelsError(f"failed to fetch data from {url} after {retry_count} attempts")
+    raise InstagramError(f"failed to fetch data from {url} after {retry_count} attempts")
 
 def _extract_json_from_raw_data(raw_data: str) -> dict:
     """extracts the main json data blob from the raw html"""
@@ -61,7 +61,7 @@ def _extract_json_from_raw_data(raw_data: str) -> dict:
     matches = re.findall(pattern, raw_data, re.DOTALL)
 
     if not matches:
-        raise InstagramReelsError("could not find any data-sjs json script tags in the response")
+        raise InstagramError("could not find any data-sjs json script tags in the response")
 
     # First try to find a script tag with video_dash_manifest
     for match_content in matches:
@@ -81,7 +81,7 @@ def _extract_json_from_raw_data(raw_data: str) -> dict:
         except json.JSONDecodeError:
             continue
 
-    raise InstagramReelsError("could not find the correct media data json in any of the script tags")
+    raise InstagramError("could not find the correct media data json in any of the script tags")
 
 def _find_media_data(data: dict) -> Optional[dict]:
     """recursively search for the main media data blob in the json"""
@@ -110,7 +110,7 @@ def _parse_metadata_from_json(json_data: dict) -> SodaliteMetadata:
     """parses the json data and returns a sodalitemetadata object"""
     media_data = _find_media_data(json_data)
     if not media_data:
-        raise InstagramReelsError("could not find media data in json structure")
+        raise InstagramError("could not find media data in json structure")
 
     unique_videos: Dict[str, Video] = {}
     unique_audios: Dict[str, Audio] = {}
@@ -157,9 +157,20 @@ def _parse_metadata_from_json(json_data: dict) -> SodaliteMetadata:
     author = media_data.get("owner", {}).get("username", "unknown")
 
     caption_node = media_data.get("caption")
-    title = caption_node.get("text").split('\n')[0] if caption_node and caption_node.get("text") else f"Instagram Reel by {author}"
+    title = caption_node.get("text").split('\n')[0] if caption_node and caption_node.get("text") else f"Instagram Post by {author}"
 
     thumbnail_url = media_data.get("image_versions2", {}).get("candidates", [{}])[0].get("url")
+
+    # if no video/audio streams, it's a photo post
+    if not videos and not audios and thumbnail_url:
+        # create a "video" from the thumbnail for downloading
+        photo_video = Video(
+            url=thumbnail_url,
+            quality="photo",
+            width=media_data.get("original_width"),
+            height=media_data.get("original_height"),
+        )
+        videos.append(photo_video)
 
     return SodaliteMetadata(
         service="instagram",
@@ -171,7 +182,7 @@ def _parse_metadata_from_json(json_data: dict) -> SodaliteMetadata:
     )
 
 async def fetch_dl(url: str, retry_count: int = 3) -> SodaliteMetadata:
-    """takes in a raw instagram reels url, and returns the metadata with retry logic"""
+    """takes in a raw instagram  url, and returns the metadata with retry logic"""
     last_error = None
 
     for attempt in range(retry_count):
@@ -180,7 +191,7 @@ async def fetch_dl(url: str, retry_count: int = 3) -> SodaliteMetadata:
             json_data = _extract_json_from_raw_data(raw_data)
             metadata = _parse_metadata_from_json(json_data)
             return metadata
-        except InstagramReelsError as e:
+        except InstagramError as e:
             last_error = e
             if "could not find the correct media data json" in str(e) or "could not find media data in json structure" in str(e):
                 if attempt < retry_count - 1:
@@ -194,4 +205,4 @@ async def fetch_dl(url: str, retry_count: int = 3) -> SodaliteMetadata:
                 continue
             raise e
 
-    raise last_error or InstagramReelsError(f"failed to fetch metadata after {retry_count} attempts")
+    raise last_error or InstagramError(f"failed to fetch metadata after {retry_count} attempts")

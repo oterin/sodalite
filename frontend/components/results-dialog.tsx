@@ -99,7 +99,7 @@ export function ResultsDialog({
       if (isPhotoPost && thumbnailUrl) {
         const photoUrl = `${sodaliteAPI.getApiBaseUrl()}/sodalite/download/photo?url=${encodeURIComponent(
           thumbnailUrl,
-        )}`;
+        )}&format=${format}`;
         window.open(photoUrl, "_blank");
         toast.success("downloading photo!");
         handleDialogClose();

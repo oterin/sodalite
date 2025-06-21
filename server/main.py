@@ -11,7 +11,7 @@ from pydantic.json import pydantic_encoder
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, Literal, List, Dict
 import git
@@ -20,10 +20,12 @@ import aiofiles
 import threading
 import time
 from contextlib import asynccontextmanager
+from PIL import Image
+import io
 
 from server.helper.detector import detect_service
 from server.helper.errors import (
-    InstagramError,
+    InstagramReelsError,
     YouTubeError,
     TikTokError
 )
@@ -81,7 +83,7 @@ class ProcessRequest(BaseModel):
     video_quality: Optional[str] = None
     audio_quality: Optional[str] = None
     format: Literal["mp4", "webm", "mkv", "mp3",
-                    "m4a", "opus", "flac", "ogg", "wav"] = "mp4"
+                    "m4a", "opus", "flac", "ogg", "wav", "jpeg", "png"] = "mp4"
     download_mode: Literal["default", "video_only", "audio_only"] = "default"
 
 
@@ -223,7 +225,7 @@ def sanitize_metadata_for_response(metadata: SodaliteMetadata) -> dict:
         "service": metadata.service,
         "title": metadata.title,
         "author": metadata.author,
-        "thumbnail_url": metadata.thumbnail_url,
+        "thumbnail_url": str(metadata.thumbnail_url) if metadata.thumbnail_url else None,
         "videos": [
             {
                 "quality": video.quality,
@@ -300,7 +302,7 @@ SERVICE_HANDLERS = {
 }
 
 SERVICE_ERRORS = {
-    "instagram": InstagramError,
+    "instagram": InstagramReelsError,
     "youtube": YouTubeError,
     "tiktok": TikTokError
 }
@@ -342,28 +344,18 @@ def generate_cache_key(url: str) -> str:
 def get_cached_metadata(url: str) -> Optional[SodaliteMetadata]:
     """get cached metadata if available and valid"""
     cache_key = generate_cache_key(url)
-    print(f"DEBUG: Checking cache for key: {cache_key}")
     if cache_key in metadata_cache:
         entry = metadata_cache[cache_key]
-        print(f"DEBUG: Cache hit. Entry found: {type(entry['metadata'])}")
         if is_cache_valid(entry):
-            print("DEBUG: Cache entry is valid.")
             return SodaliteMetadata.model_validate(entry["metadata"])
         else:
-            print("DEBUG: Cache entry is expired. Deleting.")
             del metadata_cache[cache_key]
-    else:
-        print("DEBUG: Cache miss.")
     return None
 
 
 def cache_metadata(url: str, metadata: SodaliteMetadata):
     """cache metadata for 30 seconds"""
     cache_key = generate_cache_key(url)
-    if not isinstance(metadata, SodaliteMetadata):
-        print(f"ERROR: Attempted to cache invalid metadata type: {type(metadata)}")
-        return
-    print(f"DEBUG: Caching metadata for key: {cache_key}")
     metadata_cache[cache_key] = {
         "metadata": metadata.model_dump(),
         "cached_at": time.time()
@@ -465,14 +457,9 @@ async def get_download_info(request: DownloadRequest):
             status_code=500, detail={"error": "service detected but no handler found", "service": service})
 
     try:
-        print(f"DEBUG: Calling handler for service: {service}")
         metadata = await handler(url_str)
-        print(f"DEBUG: Handler returned metadata of type: {type(metadata)}")
-        if metadata:
-            cache_metadata(url_str, metadata)
-            return sanitize_metadata_for_response(metadata)
-        else:
-            raise HTTPException(status_code=400, detail="failed to fetch metadata")
+        cache_metadata(url_str, metadata)
+        return sanitize_metadata_for_response(metadata)
 
     except SERVICE_ERRORS.get(service, Exception) as e:
         raise HTTPException(
@@ -498,15 +485,17 @@ async def process_download(
     try:
         metadata = get_cached_metadata(url_str)
         if not metadata:
-            print(f"DEBUG: No cache hit for {url_str}, fetching fresh metadata...")
+            print(f"no cache hit for {url_str}, fetching fresh metadata...")
             metadata = await handler(url_str)
-            print(f"DEBUG: Handler returned metadata of type: {type(metadata)} for process request")
             if metadata:
                 cache_metadata(url_str, metadata)
             else:
                 raise HTTPException(status_code=400, detail="failed to fetch metadata")
         else:
-            print(f"DEBUG: Cache hit for {url_str}. Using cached metadata.")
+            print(f"using cached metadata for {url_str}")
+            # re-fetch to get fresh stream urls
+            metadata = await handler(url_str)
+
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -672,28 +661,6 @@ async def websocket_stats(websocket: WebSocket):
             stats_broadcast_task.cancel()
 
 
-@app.get("/sodalite/download/photo")
-async def download_photo(url: str):
-    """download a photo directly from a url"""
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response.raise_for_status()
-                content = await response.read()
-                # create a temporary file to serve
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-                    tmp.write(content)
-                    tmp_path = tmp.name
-
-                return FileResponse(
-                    tmp_path,
-                    media_type="image/jpeg",
-                    filename="photo.jpg"
-                )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/sodalite/git-info")
 async def git_info():
     try:
@@ -736,3 +703,34 @@ async def cleanup_task(task_id: str):
         del task_phases[task_id]
 
     return {"message": "task cleaned up successfully"}
+
+@app.get("/sodalite/download/photo")
+async def download_photo(url: HttpUrl, format: str = "jpeg"):
+    """download and convert a photo from a url"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(str(url)) as response:
+                response.raise_for_status()
+                image_data = await response.read()
+
+        image = Image.open(io.BytesIO(image_data))
+
+        # ensure image is in a format that can be saved to jpeg/png
+        if image.mode in ("RGBA", "P"):
+            image = image.convert("RGB")
+
+        buffer = io.BytesIO()
+        save_format = format.upper()
+        if save_format not in ["JPEG", "PNG"]:
+            raise HTTPException(status_code=400, detail="unsupported image format")
+
+        image.save(buffer, format=save_format)
+        buffer.seek(0)
+
+        media_type = f"image/{format}"
+        filename = f"download.{format}"
+
+        return StreamingResponse(buffer, media_type=media_type, headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"failed to download or convert photo: {str(e)}")

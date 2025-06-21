@@ -3,7 +3,6 @@
   "last_updated": "2025-06-20T14:07:07.502553Z",
   "news": [
     {
-<<<<<<< HEAD
       "id": "youtube-integration-fix-210625",
       "type": "update",
       "severity": "low",
@@ -11,18 +10,9 @@
       "message": "The issue with the YouTube integration has been resolved. All related features are now operating normally.",
       "timestamp": "2025-06-20T17:07:07.502432Z",
       "expires": "2025-06-21T17:07:07.502432Z",
-=======
-      "id": "update-2025-06-21-service-outage",
-      "type": "update",
-      "severity": "medium",
-      "title": "youtube doesn't work",
-      "message": "due to youtube adding weird authentication tokens it won't work, wait for yt-dlp update",
-      "timestamp": "2025-06-20T14:07:07.502432Z",
-      "expires": "2025-06-21T14:07:07.502432Z",
->>>>>>> e7afa8cd31c3465cdec6590246d3d9450f728885
       "show_when_offline": false,
-      "icon": "wrench",
-      "color": "warning"
+      "icon": "check-circle",
+      "color": "success"
     }
   ]
 }

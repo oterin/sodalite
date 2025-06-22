@@ -8,7 +8,7 @@
       "severity": "high",
       "title": "YouTube Unsupported",
       "message": "YouTube is no longer supported due to updated platform detection methods. We are investigating potential solutions, but there is no ETA for a resolution.",
-      "timestamp": "2025-06-22T19:00:00.000000Z",
+      "timestamp": "2025-06-21T19:00:00.000000Z",
       "expires": "2099-12-31T23:59:59.999999Z",
       "show_when_offline": true,
       "icon": "alert-triangle",

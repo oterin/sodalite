@@ -21,13 +21,14 @@ def detect_service(url: str) -> str:
         return "instagram"
 
     # youtube division
-    if (
-        "youtube.com/watch" in url
-        or "youtu.be/" in url
-        or "youtube.com/shorts" in url
-        or "music.youtube.com/" in url
-    ):
-        return "youtube"
+    # if (
+    #     "youtube.com/watch" in url
+    #     or "youtu.be/" in url
+    #     or "youtube.com/shorts" in url
+    #     or "music.youtube.com/" in url
+    # ):
+    #     return "youtube"
+    # unsupported.
 
     # tiktok division
     if (

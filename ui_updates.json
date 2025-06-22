@@ -1,7 +1,19 @@
 {
   "version": "1.0.0",
-  "last_updated": "2025-06-20T14:07:07.502553Z",
+  "last_updated": "2025-06-20T19:00:00.000000Z",
   "news": [
+    {
+      "id": "youtube-unsupported-detection-220625",
+      "type": "outage",
+      "severity": "high",
+      "title": "YouTube Unsupported",
+      "message": "YouTube is no longer supported due to updated platform detection methods. We are investigating potential solutions, but there is no ETA for a resolution.",
+      "timestamp": "2025-06-22T19:00:00.000000Z",
+      "expires": "2099-12-31T23:59:59.999999Z",
+      "show_when_offline": true,
+      "icon": "alert-triangle",
+      "color": "destructive"
+    },
     {
       "id": "audio-integration-issue-210625",
       "type": "update",

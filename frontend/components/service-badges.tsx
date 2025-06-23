@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Youtube, Music2, Instagram } from "lucide-react";
 
 const services = [
-  { name: "YouTube", icon: Youtube, color: "text-red-500" },
+  /*{ name: "YouTube", icon: Youtube, color: "text-red-500" },*/
   { name: "TikTok", icon: Music2, color: "text-foreground" },
   { name: "Instagram", icon: Instagram, color: "text-pink-500" },
 ];

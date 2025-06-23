@@ -33,7 +33,7 @@ sodalite is an open-source, no-fuss downloader with real-time stats and a clean 
 ## 🌐 supported services
 
 - **tiktok** → videos and audio extraction
-- **youtube** → videos, shorts, and music
+- ~~**youtube** → videos, shorts, and music~~
 - **instagram reels** → full quality downloads
 - ... more coming soon! 🚀
 
